@@ -1,21 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import {
   StyleSheet, Text, View, ScrollView, Pressable,
   Modal, TextInput, KeyboardAvoidingView, Platform, Image,
 } from 'react-native';
 import { CARD_CATALOG, ISSUERS, type CatalogCard } from './data/cards';
-
-type UserCard = {
-  id: string;
-  catalogId: string;
-  name: string;
-  lastFour: string;
-  dueDay: number;
-  limit: string;
-  imageUrl: string;
-  color: string;
-};
+import { initDatabase, getCards, insertCard, type UserCard } from './db/database';
 
 function ordinal(n: number): string {
   const s = ['th', 'st', 'nd', 'rd'];
@@ -23,47 +13,23 @@ function ordinal(n: number): string {
   return n + (s[(v - 20) % 10] || s[v] || s[0]);
 }
 
-const initialCards: UserCard[] = [
-  {
-    id: '1',
-    catalogId: 'chase-freedom-flex',
-    name: 'Chase Freedom Flex',
-    lastFour: '4821',
-    dueDay: 15,
-    limit: '$10,000',
-    imageUrl: 'https://images.ctfassets.net/8qmz0ef3xzub/7KrVet3yXT2YntiE8PqwAe/8705c3a1b357e949f56bbab918e3cf11/freedom_flex_card_alt.webp',
-    color: '#1a3a5c',
-  },
-  {
-    id: '2',
-    catalogId: 'apple-card',
-    name: 'Apple Card',
-    lastFour: '3390',
-    dueDay: 27,
-    limit: '$5,000',
-    imageUrl: 'https://www.nerdwallet.com/cdn-cgi/image/format=auto,width=1920,quality=80,sharpen=1/cdn/images/marketplace/credit_cards/4528cd20-add2-11eb-b8c6-230f8597051d/ff9cbb30ffe2501aa1b667251366a4faf92194234ad19d87f24ccd8c839c5c7b.jpg',
-    color: '#555555',
-  },
-  {
-    id: '3',
-    catalogId: 'discover-it',
-    name: 'Discover it Cash Back',
-    lastFour: '7712',
-    dueDay: 2,
-    limit: '$3,500',
-    imageUrl: 'https://www.nerdwallet.com/cdn-cgi/image/format=auto,width=1920,quality=80,sharpen=1/cdn/images/marketplace/credit_cards/a4a36a73-0294-4ca1-b36b-3eef5cee53ca/a1de1f5a52d4ab48b729c2ea25588d40b1b0382c84ddac318b584f1d62aa37bd.jpg',
-    color: '#f06423',
-  },
-];
-
 export default function App() {
-  const [cards, setCards] = useState<UserCard[]>(initialCards);
+  const [cards, setCards] = useState<UserCard[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [step, setStep] = useState<'pick' | 'details'>('pick');
   const [selectedCard, setSelectedCard] = useState<CatalogCard | null>(null);
   const [search, setSearch] = useState('');
   const [issuerFilter, setIssuerFilter] = useState('All');
   const [form, setForm] = useState({ customName: '', lastFour: '', dueDay: '', limit: '' });
+
+  useEffect(() => {
+    try {
+      initDatabase();
+      setCards(getCards());
+    } catch (e) {
+      console.warn('Database not available on this platform:', e);
+    }
+  }, []);
 
   function openModal() {
     setStep('pick');
@@ -86,19 +52,17 @@ export default function App() {
     const name = selectedCard.id === 'custom' ? form.customName.trim() : selectedCard.name;
     if (!name) return;
 
-    setCards((prev) => [
-      ...prev,
-      {
-        id: Date.now().toString(),
-        catalogId: selectedCard.id,
-        name,
-        lastFour: form.lastFour.trim(),
-        dueDay,
-        limit: form.limit.trim(),
-        imageUrl: selectedCard.imageUrl,
-        color: selectedCard.color,
-      },
-    ]);
+    insertCard({
+      id: Date.now().toString(),
+      catalogId: selectedCard.id,
+      name,
+      lastFour: form.lastFour.trim(),
+      dueDay,
+      limit: form.limit.trim(),
+      imageUrl: selectedCard.imageUrl,
+      color: selectedCard.color,
+    });
+    setCards(getCards());
     setModalVisible(false);
   }
 
@@ -114,6 +78,12 @@ export default function App() {
       <Text style={styles.header}>My Cards</Text>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
+        {cards.length === 0 && (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyStateTitle}>No cards yet</Text>
+            <Text style={styles.emptyStateSub}>Tap + Add Card to get started</Text>
+          </View>
+        )}
         {cards.map((card) => (
           <View key={card.id} style={styles.card}>
             <View style={[styles.cardImageWrap, { backgroundColor: card.color }]}>
@@ -368,6 +338,22 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#e94560',
     textAlign: 'right',
+  },
+
+  // Empty state
+  emptyState: {
+    alignItems: 'center',
+    marginTop: 80,
+  },
+  emptyStateTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#ffffff',
+    marginBottom: 8,
+  },
+  emptyStateSub: {
+    fontSize: 14,
+    color: '#a0a0b0',
   },
 
   // Add button
