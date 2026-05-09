@@ -51,6 +51,8 @@ export const cardStyles = StyleSheet.create({
     paddingTop: 2,
     paddingLeft: 4,
   },
+
+
   cardImageWrap: {
     width: 90,
     height: 57,
