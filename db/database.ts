@@ -1,4 +1,4 @@
-import * as SQLite from 'expo-sqlite';
+import { supabase } from '../lib/supabase';
 
 export type UserCard = {
   id: string;
@@ -11,57 +11,64 @@ export type UserCard = {
   color: string;
 };
 
-let db: SQLite.SQLiteDatabase | null = null;
-
-export function initDatabase() {
-  db = SQLite.openDatabaseSync('cards.db');
-  db.execSync(`
-    CREATE TABLE IF NOT EXISTS cards (
-      id TEXT PRIMARY KEY NOT NULL,
-      catalogId TEXT NOT NULL,
-      name TEXT NOT NULL,
-      lastFour TEXT,
-      dueDay INTEGER NOT NULL,
-      cardLimit TEXT,
-      imageUrl TEXT,
-      color TEXT
-    )
-  `);
+function toRow(card: UserCard) {
+  return {
+    id: card.id,
+    catalog_id: card.catalogId,
+    name: card.name,
+    last_four: card.lastFour,
+    due_day: card.dueDay,
+    card_limit: card.limit,
+    image_url: card.imageUrl,
+    color: card.color,
+  };
 }
 
-export function getCards(): UserCard[] {
-  if (!db) return [];
-  const rows = db.getAllSync<{
-    id: string;
-    catalogId: string;
-    name: string;
-    lastFour: string;
-    dueDay: number;
-    cardLimit: string;
-    imageUrl: string;
-    color: string;
-  }>('SELECT * FROM cards ORDER BY dueDay ASC');
-
-  return rows.map((row) => ({ ...row, limit: row.cardLimit }));
+function fromRow(row: Record<string, unknown>): UserCard {
+  return {
+    id: row.id as string,
+    catalogId: row.catalog_id as string,
+    name: row.name as string,
+    lastFour: row.last_four as string,
+    dueDay: row.due_day as number,
+    limit: row.card_limit as string,
+    imageUrl: row.image_url as string,
+    color: row.color as string,
+  };
 }
 
-export function insertCard(card: UserCard) {
-  if (!db) return;
-  db.runSync(
-    'INSERT INTO cards (id, catalogId, name, lastFour, dueDay, cardLimit, imageUrl, color) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-    [card.id, card.catalogId, card.name, card.lastFour, card.dueDay, card.limit, card.imageUrl, card.color]
-  );
+export async function getCards(): Promise<UserCard[]> {
+  const { data, error } = await supabase
+    .from('cards')
+    .select('*')
+    .order('due_day', { ascending: true });
+
+  if (error) throw new Error(error.message);
+  return (data ?? []).map(fromRow);
 }
 
-export function deleteCard(id: string) {
-  if (!db) return;
-  db.runSync('DELETE FROM cards WHERE id = ?', [id]);
+export async function insertCard(card: UserCard): Promise<void> {
+  const { error } = await supabase
+    .from('cards')
+    .insert(toRow(card));
+
+  if (error) throw new Error(error.message);
 }
 
-export function updateCard(card: UserCard) {
-  if (!db) return;
-  db.runSync(
-    'UPDATE cards SET catalogId = ?, name = ?, lastFour = ?, dueDay = ?, cardLimit = ?, imageUrl = ?, color = ? WHERE id = ?',
-    [card.catalogId, card.name, card.lastFour, card.dueDay, card.limit, card.imageUrl, card.color, card.id]
-  );
+export async function deleteCard(id: string): Promise<void> {
+  const { error } = await supabase
+    .from('cards')
+    .delete()
+    .eq('id', id);
+
+  if (error) throw new Error(error.message);
+}
+
+export async function updateCard(card: UserCard): Promise<void> {
+  const { error } = await supabase
+    .from('cards')
+    .update(toRow(card))
+    .eq('id', card.id);
+
+  if (error) throw new Error(error.message);
 }
