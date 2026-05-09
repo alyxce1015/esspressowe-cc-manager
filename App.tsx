@@ -730,16 +730,21 @@ export default function App() {
                             <Text style={styles.setDateHint}>Add fee due date to track ${annualFee}/yr renewal</Text>
                           )}
 
-                          {benefits.length > 0 && (
-                            <View style={styles.benefitsRow}>
-                              {benefits.slice(0, 3).map((b, i) => (
-                                <View key={i} style={styles.benefitChip}>
-                                  <FontAwesome6 name={b.icon} size={10} color="#6F4E37" iconStyle="solid" />
-                                  <Text style={styles.benefitChipText}> {b.multiplier}</Text>
-                                </View>
-                              ))}
-                            </View>
-                          )}
+                          {benefits.length > 0 && (() => {
+                            const bonus = benefits.filter(b => b.category !== 'All Purchases').slice(0, 3);
+                            const base = benefits.find(b => b.category === 'All Purchases');
+                            const chips = base ? [...bonus, base] : bonus;
+                            return (
+                              <View style={styles.benefitsRow}>
+                                {chips.map((b, i) => (
+                                  <View key={i} style={[styles.benefitChip, b.category === 'All Purchases' && { backgroundColor: 'rgba(122,158,126,0.2)' }]}>
+                                    <FontAwesome6 name={b.icon} size={10} color={b.category === 'All Purchases' ? '#7A9E7E' : '#6F4E37'} iconStyle="solid" />
+                                    <Text style={[styles.benefitChipText, b.category === 'All Purchases' && { color: '#7A9E7E' }]}> {b.multiplier}</Text>
+                                  </View>
+                                ))}
+                              </View>
+                            );
+                          })()}
                         </View>
                       </Pressable>
 
