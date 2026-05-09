@@ -7,12 +7,22 @@ export const layoutStyles = StyleSheet.create({
     paddingTop: 60,
     paddingHorizontal: 20,
   },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+  },
   header: {
     fontSize: 34,
     fontWeight: '700',
     color: '#1c1c1e',
-    marginBottom: 20,
     letterSpacing: -0.5,
+  },
+  selectButton: {
+    fontSize: 16,
+    color: '#007aff',
+    fontWeight: '500',
   },
   scrollContent: {
     paddingBottom: 20,
@@ -30,6 +40,47 @@ export const layoutStyles = StyleSheet.create({
   },
   emptyStateSub: {
     fontSize: 14,
+    color: '#aeaeb2',
+  },
+
+  deleteErrorText: {
+    color: '#ff3b30',
+    fontSize: 13,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  selectModeBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 32,
+  },
+  selectedCount: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#aeaeb2',
+    flexShrink: 1,
+  },
+  deleteSelectedButton: {
+    flex: 1,
+    backgroundColor: '#ff3b30',
+    borderRadius: 16,
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  deleteSelectedButtonDisabled: {
+    backgroundColor: '#f2f2f7',
+  },
+  deleteSelectedButtonPressed: {
+    opacity: 0.8,
+    transform: [{ scale: 0.98 }],
+  },
+  deleteSelectedText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  deleteSelectedTextDisabled: {
     color: '#aeaeb2',
   },
 

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useFonts } from 'expo-font';
 import { StatusBar } from 'expo-status-bar';
 import {
-  Text, View, ScrollView, Pressable,
+  Text, View, ScrollView, Pressable, TouchableOpacity,
   Modal, TextInput, KeyboardAvoidingView, Platform, Image,
   useWindowDimensions, Animated,
 } from 'react-native';
@@ -11,7 +11,7 @@ import { cardStyles } from './styles/card';
 import { modalStyles } from './styles/modal';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { CARD_CATALOG, ISSUERS, type CatalogCard } from './data/cards';
-import { getCards, insertCard, type UserCard } from './db/database';
+import { getCards, insertCard, deleteCard, deleteCards, type UserCard } from './db/database';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -100,6 +100,9 @@ export default function App() {
   const [issuerFilter, setIssuerFilter] = useState('All');
   const [form, setForm] = useState({ customName: '', lastFour: '', dueDay: '', limit: '', memberSince: '' });
   const [saveError, setSaveError] = useState('');
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [deleteError, setDeleteError] = useState('');
 
   const stepAnim = useRef(new Animated.Value(1)).current;
 
@@ -110,6 +113,49 @@ export default function App() {
   }, []);
 
   if (!fontsLoaded) return null;
+
+  function enterSelectMode() {
+    setSelectMode(true);
+    setSelectedIds(new Set());
+  }
+
+  function exitSelectMode() {
+    setSelectMode(false);
+    setSelectedIds(new Set());
+  }
+
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  async function handleDeleteOne(id: string) {
+    setDeleteError('');
+    setCards(prev => prev.filter(c => c.id !== id));
+    try {
+      await deleteCard(id);
+    } catch (e) {
+      setCards(await getCards());
+      setDeleteError(e instanceof Error ? e.message : 'Could not remove card');
+    }
+  }
+
+  async function handleDeleteSelected() {
+    if (selectedIds.size === 0) return;
+    setDeleteError('');
+    const ids = [...selectedIds];
+    exitSelectMode();
+    setCards(prev => prev.filter(c => !ids.includes(c.id)));
+    try {
+      await deleteCards(ids);
+    } catch (e) {
+      setCards(await getCards());
+      setDeleteError(e instanceof Error ? e.message : 'Could not remove cards');
+    }
+  }
 
   function openModal() {
     setStep('pick');
@@ -187,7 +233,18 @@ export default function App() {
   return (
     <View style={styles.container}>
       <StatusBar style="dark" />
-      <Text style={styles.header}>My Cards</Text>
+      <View style={styles.headerRow}>
+        <Text style={styles.header}>My Cards</Text>
+        {cards.length > 0 && (
+          <Pressable onPress={selectMode ? exitSelectMode : enterSelectMode} hitSlop={8}>
+            <Text style={styles.selectButton}>{selectMode ? 'Cancel' : 'Select'}</Text>
+          </Pressable>
+        )}
+      </View>
+
+      {deleteError !== '' && (
+        <Text style={styles.deleteErrorText}>{deleteError}</Text>
+      )}
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {cards.length === 0 && (
@@ -203,87 +260,130 @@ export default function App() {
           const annualFee = catalogEntry?.annualFee ?? 0;
           const benefits = catalogEntry?.benefits ?? [];
 
+          const isSelected = selectedIds.has(card.id);
+
           return (
-            <Pressable
-              key={card.id}
-              style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
-            >
-              {/* Card image */}
-              <View style={[styles.cardImageWrap, { backgroundColor: card.color }]}>
-                {imageSource
-                  ? <Image source={imageSource} style={styles.cardImage} resizeMode="cover" />
-                  : <Text style={styles.customCardLabel}>{card.name}</Text>
-                }
-              </View>
-
-              {/* Card info */}
-              <View style={styles.cardInfo}>
-
-                {/* Name + annual fee badge */}
-                <View style={styles.cardNameRow}>
-                  <Text style={styles.cardName} numberOfLines={1}>{card.name}</Text>
-                  <View style={styles.feeBadge}>
-                    <Text style={styles.feeBadgeText}>
-                      {annualFee === 0 ? '$0' : `$${annualFee}`}
-                    </Text>
+            <View key={card.id} style={[styles.card, isSelected && styles.cardSelected]}>
+              {/* Card content — Pressable only active in select mode */}
+              <Pressable
+                style={({ pressed }) => [
+                  styles.cardInner,
+                  pressed && selectMode && styles.cardPressed,
+                ]}
+                onPress={selectMode ? () => toggleSelect(card.id) : undefined}
+              >
+                {/* Checkbox in select mode */}
+                {selectMode && (
+                  <View style={[styles.checkbox, isSelected && styles.checkboxSelected]}>
+                    {isSelected && <FontAwesome6 name="check" size={10} color="#fff" iconStyle="solid" />}
                   </View>
+                )}
+
+                {/* Card image */}
+                <View style={[styles.cardImageWrap, { backgroundColor: card.color }]}>
+                  {imageSource
+                    ? <Image source={imageSource} style={styles.cardImage} resizeMode="cover" />
+                    : <Text style={styles.customCardLabel}>{card.name}</Text>
+                  }
                 </View>
 
-                {/* Last 4 */}
-                <Text style={styles.cardLast4}>•••• {card.lastFour}</Text>
+                {/* Card info */}
+                <View style={styles.cardInfo}>
 
-                {/* Annual fee section */}
-                {annualFee === 0 ? (
-                  <View style={styles.noFeePill}>
-                    <Text style={styles.noFeePillText}>No annual fee</Text>
-                  </View>
-                ) : card.memberSince ? (
-                  <View style={styles.renewalSection}>
-                    <View style={styles.renewalRow}>
-                      <Text style={styles.renewalLabel}>Next annual fee</Text>
-                      <Text style={styles.daysText}>
-                        {daysUntilRenewal(card.memberSince)} days remaining
+                  {/* Name + annual fee badge */}
+                  <View style={styles.cardNameRow}>
+                    <Text style={styles.cardName} numberOfLines={1}>{card.name}</Text>
+                    <View style={styles.feeBadge}>
+                      <Text style={styles.feeBadgeText}>
+                        {annualFee === 0 ? '$0' : `$${annualFee}`}
                       </Text>
                     </View>
-                    <View style={styles.progressTrack}>
-                      <View
-                        style={[
-                          styles.progressFill,
-                          { width: `${Math.round(renewalProgress(card.memberSince) * 100)}%` },
-                        ]}
-                      />
-                    </View>
-                    <Text style={styles.renewalDateText}>
-                      {formatRenewalDate(card.memberSince)}
-                    </Text>
                   </View>
-                ) : (
-                  <Text style={styles.setDateHint}>Add open date to track renewal</Text>
-                )}
 
-                {/* Benefit chips */}
-                {benefits.length > 0 && (
-                  <View style={styles.benefitsRow}>
-                    {benefits.slice(0, 3).map((b, i) => (
-                      <View key={i} style={styles.benefitChip}>
-                        <FontAwesome6 name={b.icon} size={10} color="#6c6c70" iconStyle="regular" />
-                        <Text style={styles.benefitChipText}> {b.multiplier}</Text>
+                  {/* Last 4 */}
+                  <Text style={styles.cardLast4}>•••• {card.lastFour}</Text>
+
+                  {/* Annual fee section */}
+                  {annualFee === 0 ? (
+                    <View style={styles.noFeePill}>
+                      <Text style={styles.noFeePillText}>No annual fee</Text>
+                    </View>
+                  ) : card.memberSince ? (
+                    <View style={styles.renewalSection}>
+                      <View style={styles.renewalRow}>
+                        <Text style={styles.renewalLabel}>Next annual fee</Text>
+                        <Text style={styles.daysText}>
+                          {daysUntilRenewal(card.memberSince)} days remaining
+                        </Text>
                       </View>
-                    ))}
-                  </View>
-                )}
-              </View>
-            </Pressable>
+                      <View style={styles.progressTrack}>
+                        <View
+                          style={[
+                            styles.progressFill,
+                            { width: `${Math.round(renewalProgress(card.memberSince) * 100)}%` },
+                          ]}
+                        />
+                      </View>
+                      <Text style={styles.renewalDateText}>
+                        {formatRenewalDate(card.memberSince)}
+                      </Text>
+                    </View>
+                  ) : (
+                    <Text style={styles.setDateHint}>Add open date to track renewal</Text>
+                  )}
+
+                  {/* Benefit chips */}
+                  {benefits.length > 0 && (
+                    <View style={styles.benefitsRow}>
+                      {benefits.slice(0, 3).map((b, i) => (
+                        <View key={i} style={styles.benefitChip}>
+                          <FontAwesome6 name={b.icon} size={10} color="#6c6c70" iconStyle="solid" />
+                          <Text style={styles.benefitChipText}> {b.multiplier}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+                </View>
+              </Pressable>
+
+              {/* Trash button — sibling to content, not nested inside it */}
+              {!selectMode && (
+                <TouchableOpacity style={styles.trashButton} onPress={() => handleDeleteOne(card.id)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                  <FontAwesome6 name="trash" size={14} color="#c7c7cc" iconStyle="solid" />
+                </TouchableOpacity>
+              )}
+            </View>
           );
         })}
       </ScrollView>
 
-      <Pressable
-        style={({ pressed }) => [styles.addButton, pressed && styles.addButtonPressed]}
-        onPress={openModal}
-      >
-        <Text style={styles.addButtonText}>+ Add Card</Text>
-      </Pressable>
+      {selectMode ? (
+        <View style={styles.selectModeBar}>
+          <Text style={styles.selectedCount}>
+            {selectedIds.size === 0 ? 'Tap cards to select' : `${selectedIds.size} selected`}
+          </Text>
+          <TouchableOpacity
+            style={[
+              styles.deleteSelectedButton,
+              selectedIds.size === 0 && styles.deleteSelectedButtonDisabled,
+            ]}
+            onPress={handleDeleteSelected}
+            disabled={selectedIds.size === 0}
+            activeOpacity={0.75}
+          >
+            <Text style={[styles.deleteSelectedText, selectedIds.size === 0 && styles.deleteSelectedTextDisabled]}>
+              {selectedIds.size > 0 ? `Remove (${selectedIds.size})` : 'Remove'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <Pressable
+          style={({ pressed }) => [styles.addButton, pressed && styles.addButtonPressed]}
+          onPress={openModal}
+        >
+          <Text style={styles.addButtonText}>+ Add Card</Text>
+        </Pressable>
+      )}
 
       {/* ── Add Card Modal ── */}
       <Modal visible={modalVisible} animationType="slide" transparent>

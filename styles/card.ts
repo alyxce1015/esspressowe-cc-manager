@@ -17,9 +17,39 @@ export const cardStyles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 2,
   },
+  cardInner: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 14,
+  },
   cardPressed: {
     opacity: 0.75,
     transform: [{ scale: 0.985 }],
+  },
+  cardSelected: {
+    borderColor: '#007aff',
+    backgroundColor: '#f0f6ff',
+  },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    borderColor: '#c7c7cc',
+    justifyContent: 'center',
+    alignItems: 'center',
+    alignSelf: 'center',
+    flexShrink: 0,
+  },
+  checkboxSelected: {
+    backgroundColor: '#007aff',
+    borderColor: '#007aff',
+  },
+  trashButton: {
+    alignSelf: 'flex-start',
+    paddingTop: 2,
+    paddingLeft: 4,
   },
   cardImageWrap: {
     width: 90,

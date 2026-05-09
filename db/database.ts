@@ -67,6 +67,15 @@ export async function deleteCard(id: string): Promise<void> {
   if (error) throw new Error(error.message);
 }
 
+export async function deleteCards(ids: string[]): Promise<void> {
+  const { error } = await supabase
+    .from('cards')
+    .delete()
+    .in('id', ids);
+
+  if (error) throw new Error(error.message);
+}
+
 export async function updateCard(card: UserCard): Promise<void> {
   const { error } = await supabase
     .from('cards')
