@@ -220,6 +220,48 @@ export const modalStyles = StyleSheet.create({
     fontSize: 15,
     marginBottom: 16,
   },
+  benefitsGridLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#aeaeb2',
+    marginBottom: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  benefitsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginBottom: 16,
+  },
+  benefitCol: {
+    alignItems: 'center',
+    gap: 5,
+    minWidth: 52,
+  },
+  benefitColLabel: {
+    fontSize: 9,
+    fontWeight: '600',
+    color: '#aeaeb2',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+    textAlign: 'center',
+  },
+  benefitColPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f0f6ff',
+    borderRadius: 20,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    gap: 4,
+  },
+  benefitColPillText: {
+    fontSize: 12,
+    color: '#007aff',
+    fontWeight: '700',
+  },
+
   saveErrorText: {
     color: '#ff3b30',
     fontSize: 13,

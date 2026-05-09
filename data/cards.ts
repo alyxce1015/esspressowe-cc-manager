@@ -1,7 +1,6 @@
 import { ImageSourcePropType } from 'react-native';
 
 export type Benefit = {
-  // FontAwesome5 solid icon name — browse all options at https://fontawesome.com/icons?s=solid
   icon: string;
   category: string;
   multiplier: string;
@@ -17,22 +16,25 @@ export type CatalogCard = {
   benefits: Benefit[];
 };
 
-export const ISSUERS = ['All', 'Chase', 'Amex', 'Capital One', 'Citi', 'Other'];
+export const ISSUERS = ['All', 'Chase', 'Amex', 'Capital One', 'Citi', 'Wells Fargo', 'Bank of America', 'US Bank', 'Discover', 'Other'];
 
-// ─── Icon name reference (FontAwesome6 free/regular names) ──────────────────
-// travel      → 'plane'
-// hotel       → 'hotel'
-// dining      → 'utensils'
-// groceries   → 'basket-shopping'
-// streaming   → 'tv'
-// gas         → 'gas-pump'
-// cashback    → 'money-bill'
-// rotating    → 'arrows-rotate'
-// home/rent   → 'house'
-// general/all → 'star'
-// mobile/tech → 'mobile-screen'
-// credit      → 'credit-card'
-// Browse all: https://fontawesome.com/icons?s=regular&m=free
+// ─── Icon name reference (FontAwesome6 free names) ───────────────────────────
+// travel/flights  → 'plane'
+// hotel           → 'hotel'
+// dining          → 'utensils'
+// groceries       → 'basket-shopping'
+// streaming       → 'tv'
+// gas             → 'gas-pump'
+// cashback/flat   → 'money-bill'
+// rotating cats   → 'arrows-rotate'
+// home/rent       → 'house'
+// mobile/apple    → 'mobile-screen'
+// card/apple pay  → 'credit-card'
+// drugstore       → 'store'
+// transit         → 'train'
+// online retail   → 'cart-shopping'
+// car rental      → 'car'
+// Browse all: https://fontawesome.com/icons?m=free
 // ────────────────────────────────────────────────────────────────────────────
 
 export const CARD_CATALOG: CatalogCard[] = [
@@ -44,9 +46,10 @@ export const CARD_CATALOG: CatalogCard[] = [
     color: '#1a3a5c',
     annualFee: 795,
     benefits: [
-      { icon: 'plane', category: 'Travel', multiplier: '5x' },
-      { icon: 'utensils', category: 'Dining', multiplier: '3x' },
-      { icon: 'star', category: 'Other', multiplier: '1x' },
+      { icon: 'plane',          category: 'Chase Travel', multiplier: '8x'   },
+      { icon: 'hotel',          category: 'Hotels',       multiplier: '4x'   },
+      { icon: 'utensils',       category: 'Dining',       multiplier: '3x'   },
+      { icon: 'money-bill',     category: 'All Purchases',multiplier: '1x'   },
     ],
   },
   {
@@ -57,9 +60,11 @@ export const CARD_CATALOG: CatalogCard[] = [
     color: '#1a3a5c',
     annualFee: 95,
     benefits: [
-      { icon: 'utensils', category: 'Dining', multiplier: '3x' },
-      { icon: 'plane', category: 'Travel', multiplier: '2x' },
-      { icon: 'star', category: 'Other', multiplier: '1x' },
+      { icon: 'plane',          category: 'Chase Travel', multiplier: '5x'   },
+      { icon: 'utensils',       category: 'Dining',       multiplier: '3x'   },
+      { icon: 'basket-shopping',category: 'Groceries',    multiplier: '3x'   },
+      { icon: 'tv',             category: 'Streaming',    multiplier: '3x'   },
+      { icon: 'money-bill',     category: 'All Purchases',multiplier: '1x'   },
     ],
   },
   {
@@ -70,9 +75,11 @@ export const CARD_CATALOG: CatalogCard[] = [
     color: '#1a3a5c',
     annualFee: 0,
     benefits: [
-      { icon: 'arrows-rotate', category: 'Rotating', multiplier: '5%' },
-      { icon: 'utensils', category: 'Dining', multiplier: '3%' },
-      { icon: 'star', category: 'Other', multiplier: '1%' },
+      { icon: 'arrows-rotate',  category: 'Rotating',     multiplier: '5%'   },
+      { icon: 'plane',          category: 'Chase Travel', multiplier: '5%'   },
+      { icon: 'utensils',       category: 'Dining',       multiplier: '3%'   },
+      { icon: 'store',          category: 'Drugstore',    multiplier: '3%'   },
+      { icon: 'money-bill',     category: 'All Purchases',multiplier: '1%'   },
     ],
   },
   {
@@ -83,9 +90,10 @@ export const CARD_CATALOG: CatalogCard[] = [
     color: '#1a3a5c',
     annualFee: 0,
     benefits: [
-      { icon: 'utensils', category: 'Dining', multiplier: '3%' },
-      { icon: 'plane', category: 'Travel', multiplier: '5%' },
-      { icon: 'star', category: 'Other', multiplier: '1.5%' },
+      { icon: 'plane',          category: 'Chase Travel', multiplier: '5%'   },
+      { icon: 'utensils',       category: 'Dining',       multiplier: '3%'   },
+      { icon: 'store',          category: 'Drugstore',    multiplier: '3%'   },
+      { icon: 'money-bill',     category: 'All Purchases',multiplier: '1.5%' },
     ],
   },
   {
@@ -96,9 +104,10 @@ export const CARD_CATALOG: CatalogCard[] = [
     color: '#c9922a',
     annualFee: 325,
     benefits: [
-      { icon: 'utensils', category: 'Dining', multiplier: '4x' },
-      { icon: 'basket-shopping', category: 'Groceries', multiplier: '4x' },
-      { icon: 'plane', category: 'Travel', multiplier: '3x' },
+      { icon: 'utensils',       category: 'Dining',       multiplier: '4x'   },
+      { icon: 'basket-shopping',category: 'Groceries',    multiplier: '4x'   },
+      { icon: 'plane',          category: 'Flights',      multiplier: '3x'   },
+      { icon: 'money-bill',     category: 'All Purchases',multiplier: '1x'   },
     ],
   },
   {
@@ -109,9 +118,9 @@ export const CARD_CATALOG: CatalogCard[] = [
     color: '#8c8c8c',
     annualFee: 895,
     benefits: [
-      { icon: 'plane', category: 'Flights', multiplier: '5x' },
-      { icon: 'hotel', category: 'Hotels', multiplier: '5x' },
-      { icon: 'star', category: 'Other', multiplier: '1x' },
+      { icon: 'plane',          category: 'Flights',      multiplier: '5x'   },
+      { icon: 'hotel',          category: 'Hotels',       multiplier: '5x'   },
+      { icon: 'money-bill',     category: 'All Purchases',multiplier: '1x'   },
     ],
   },
   {
@@ -122,9 +131,11 @@ export const CARD_CATALOG: CatalogCard[] = [
     color: '#1a4b8c',
     annualFee: 95,
     benefits: [
-      { icon: 'basket-shopping', category: 'Groceries', multiplier: '6%' },
-      { icon: 'tv', category: 'Streaming', multiplier: '6%' },
-      { icon: 'gas-pump', category: 'Gas', multiplier: '3%' },
+      { icon: 'basket-shopping',category: 'Groceries',    multiplier: '6%'   },
+      { icon: 'tv',             category: 'Streaming',    multiplier: '6%'   },
+      { icon: 'gas-pump',       category: 'Gas',          multiplier: '3%'   },
+      { icon: 'train',          category: 'Transit',      multiplier: '3%'   },
+      { icon: 'money-bill',     category: 'All Purchases',multiplier: '1%'   },
     ],
   },
   {
@@ -135,9 +146,10 @@ export const CARD_CATALOG: CatalogCard[] = [
     color: '#1a4b8c',
     annualFee: 0,
     benefits: [
-      { icon: 'basket-shopping', category: 'Groceries', multiplier: '3%' },
-      { icon: 'tv', category: 'Streaming', multiplier: '3%' },
-      { icon: 'gas-pump', category: 'Gas', multiplier: '2%' },
+      { icon: 'basket-shopping',category: 'Groceries',    multiplier: '3%'   },
+      { icon: 'cart-shopping',  category: 'Online',       multiplier: '3%'   },
+      { icon: 'gas-pump',       category: 'Gas',          multiplier: '3%'   },
+      { icon: 'money-bill',     category: 'All Purchases',multiplier: '1%'   },
     ],
   },
   {
@@ -148,7 +160,7 @@ export const CARD_CATALOG: CatalogCard[] = [
     color: '#003b70',
     annualFee: 0,
     benefits: [
-      { icon: 'money-bill', category: 'All Purchases', multiplier: '2%' },
+      { icon: 'money-bill',     category: 'All Purchases',multiplier: '2%'   },
     ],
   },
   {
@@ -159,8 +171,8 @@ export const CARD_CATALOG: CatalogCard[] = [
     color: '#003b70',
     annualFee: 0,
     benefits: [
-      { icon: 'arrows-rotate', category: 'Top Category', multiplier: '5%' },
-      { icon: 'star', category: 'Other', multiplier: '1%' },
+      { icon: 'arrows-rotate',  category: 'Top Category', multiplier: '5%'   },
+      { icon: 'money-bill',     category: 'All Purchases',multiplier: '1%'   },
     ],
   },
   {
@@ -171,9 +183,12 @@ export const CARD_CATALOG: CatalogCard[] = [
     color: '#003b70',
     annualFee: 95,
     benefits: [
-      { icon: 'plane', category: 'Travel', multiplier: '3x' },
-      { icon: 'utensils', category: 'Dining', multiplier: '3x' },
-      { icon: 'basket-shopping', category: 'Groceries', multiplier: '3x' },
+      { icon: 'plane',          category: 'Air Travel',   multiplier: '3x'   },
+      { icon: 'hotel',          category: 'Hotels',       multiplier: '3x'   },
+      { icon: 'utensils',       category: 'Dining',       multiplier: '3x'   },
+      { icon: 'basket-shopping',category: 'Groceries',    multiplier: '3x'   },
+      { icon: 'gas-pump',       category: 'Gas',          multiplier: '3x'   },
+      { icon: 'money-bill',     category: 'All Purchases',multiplier: '1x'   },
     ],
   },
   {
@@ -184,9 +199,10 @@ export const CARD_CATALOG: CatalogCard[] = [
     color: '#004977',
     annualFee: 395,
     benefits: [
-      { icon: 'plane', category: 'Travel', multiplier: '10x' },
-      { icon: 'hotel', category: 'Hotels', multiplier: '5x' },
-      { icon: 'star', category: 'Other', multiplier: '2x' },
+      { icon: 'hotel',          category: 'Hotels',       multiplier: '10x'  },
+      { icon: 'car',            category: 'Car Rental',   multiplier: '10x'  },
+      { icon: 'plane',          category: 'Flights',      multiplier: '5x'   },
+      { icon: 'money-bill',     category: 'All Purchases',multiplier: '2x'   },
     ],
   },
   {
@@ -197,8 +213,9 @@ export const CARD_CATALOG: CatalogCard[] = [
     color: '#004977',
     annualFee: 95,
     benefits: [
-      { icon: 'plane', category: 'Travel', multiplier: '5x' },
-      { icon: 'star', category: 'Other', multiplier: '2x' },
+      { icon: 'hotel',          category: 'Hotels',       multiplier: '5x'   },
+      { icon: 'car',            category: 'Car Rental',   multiplier: '5x'   },
+      { icon: 'money-bill',     category: 'All Purchases',multiplier: '2x'   },
     ],
   },
   {
@@ -209,19 +226,19 @@ export const CARD_CATALOG: CatalogCard[] = [
     color: '#004977',
     annualFee: 0,
     benefits: [
-      { icon: 'money-bill', category: 'All Purchases', multiplier: '1.5%' },
+      { icon: 'money-bill',     category: 'All Purchases',multiplier: '1.5%' },
     ],
   },
   {
     id: 'discover-it',
     name: 'Discover it Cash Back',
-    issuer: 'Other',
+    issuer: 'Discover',
     image: require('../assets/CC_images/DiscoverIT.jpg'),
     color: '#f06423',
     annualFee: 0,
     benefits: [
-      { icon: 'arrows-rotate', category: 'Rotating', multiplier: '5%' },
-      { icon: 'star', category: 'Other', multiplier: '1%' },
+      { icon: 'arrows-rotate',  category: 'Rotating',     multiplier: '5%'   },
+      { icon: 'money-bill',     category: 'All Purchases',multiplier: '1%'   },
     ],
   },
   {
@@ -232,33 +249,33 @@ export const CARD_CATALOG: CatalogCard[] = [
     color: '#555555',
     annualFee: 0,
     benefits: [
-      { icon: 'mobile-screen', category: 'Apple', multiplier: '3%' },
-      { icon: 'credit-card', category: 'Apple Pay', multiplier: '2%' },
-      { icon: 'star', category: 'Other', multiplier: '1%' },
+      { icon: 'mobile-screen',  category: 'Apple/Partners',multiplier: '3%'  },
+      { icon: 'credit-card',    category: 'Apple Pay',    multiplier: '2%'   },
+      { icon: 'money-bill',     category: 'All Purchases',multiplier: '1%'   },
     ],
   },
   {
     id: 'wells-fargo-active-cash',
     name: 'Wells Fargo Active Cash',
-    issuer: 'Other',
+    issuer: 'Wells Fargo',
     image: { uri: 'https://www.nerdwallet.com/cdn-cgi/image/format=auto,width=1920,quality=80,sharpen=1/cdn/images/marketplace/credit_cards/b954a46c-caec-11eb-abf1-efb90fc6e740/403a0deae03eaff0d1ca2c7ab1175fcc45ebc9a9551d0c8104e758b3d82771d1.jpg' },
     color: '#c8102e',
     annualFee: 0,
     benefits: [
-      { icon: 'money-bill', category: 'All Purchases', multiplier: '2%' },
+      { icon: 'money-bill',     category: 'All Purchases',multiplier: '2%'   },
     ],
   },
   {
     id: 'bofa-customized-cash',
     name: 'Bank of America Customized Cash Rewards',
-    issuer: 'Other',
+    issuer: 'Bank of America',
     image: require('../assets/CC_images/bofaCC.png'),
     color: '#c8102e',
     annualFee: 0,
     benefits: [
-      { icon: 'arrows-rotate', category: 'Top Category', multiplier: '3%' },
-      { icon: 'basket-shopping', category: 'Groceries', multiplier: '2%' },
-      { icon: 'star', category: 'Other', multiplier: '1%' },
+      { icon: 'arrows-rotate',  category: 'Choice Cat.',  multiplier: '3%'   },
+      { icon: 'basket-shopping',category: 'Groceries',    multiplier: '2%'   },
+      { icon: 'money-bill',     category: 'All Purchases',multiplier: '1%'   },
     ],
   },
   {
@@ -269,9 +286,10 @@ export const CARD_CATALOG: CatalogCard[] = [
     color: '#1a1a1a',
     annualFee: 0,
     benefits: [
-      { icon: 'utensils', category: 'Dining', multiplier: '3x' },
-      { icon: 'plane', category: 'Travel', multiplier: '2x' },
-      { icon: 'house', category: 'Rent', multiplier: '1x' },
+      { icon: 'utensils',       category: 'Dining',       multiplier: '3x'   },
+      { icon: 'plane',          category: 'Travel',       multiplier: '2x'   },
+      { icon: 'house',          category: 'Rent',         multiplier: '1x'   },
+      { icon: 'money-bill',     category: 'All Purchases',multiplier: '1x'   },
     ],
   },
   {
@@ -282,21 +300,23 @@ export const CARD_CATALOG: CatalogCard[] = [
     color: '#1a1a1a',
     annualFee: 50,
     benefits: [
-      { icon: 'plane', category: 'Travel', multiplier: '5%' },
-      { icon: 'money-bill', category: 'Other', multiplier: '3%' },
+      { icon: 'plane',          category: 'Travel Portal',multiplier: '5%'   },
+      { icon: 'money-bill',     category: 'All Purchases',multiplier: '3%'   },
     ],
   },
   {
     id: 'us-bank-altitude-go',
     name: 'US Bank Altitude Go',
-    issuer: 'Other',
+    issuer: 'US Bank',
     image: { uri: 'https://www.usbank.com/content/dam/usbank/en/images/illustrations/card-art/credit-cards/altitude-go-visa-signature-credit-card.png' },
     color: '#002b49',
     annualFee: 0,
     benefits: [
-      { icon: 'utensils', category: 'Dining', multiplier: '4x' },
-      { icon: 'tv', category: 'Streaming', multiplier: '2x' },
-      { icon: 'basket-shopping', category: 'Groceries', multiplier: '2x' },
+      { icon: 'utensils',       category: 'Dining',       multiplier: '4x'   },
+      { icon: 'basket-shopping',category: 'Groceries',    multiplier: '2x'   },
+      { icon: 'gas-pump',       category: 'Gas',          multiplier: '2x'   },
+      { icon: 'tv',             category: 'Streaming',    multiplier: '2x'   },
+      { icon: 'money-bill',     category: 'All Purchases',multiplier: '1x'   },
     ],
   },
   {

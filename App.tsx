@@ -30,14 +30,28 @@ function formatCurrency(input: string): string {
   return '$' + parseInt(digits, 10).toLocaleString('en-US');
 }
 
-// Parses "MM/YYYY" → "YYYY-MM-01", returns undefined if invalid
+function formatMemberSince(input: string): string {
+  const digits = input.replace(/[^0-9]/g, '').slice(0, 6);
+  if (digits.length <= 2) return digits;
+  return digits.slice(0, 2) + '/' + digits.slice(2);
+}
+
+// Parses "MM/YYYY" → "YYYY-MM-01", returns undefined if invalid or out of range
 function parseMemberSince(input: string): string | undefined {
   const match = input.trim().match(/^(\d{1,2})\/(\d{4})$/);
   if (!match) return undefined;
   const month = parseInt(match[1], 10);
   const year = parseInt(match[2], 10);
   if (month < 1 || month > 12) return undefined;
-  if (year < 1990 || year > new Date().getFullYear() + 1) return undefined;
+
+  const today = new Date();
+  const currentYear = today.getFullYear();
+  const currentMonth = today.getMonth() + 1;
+  const minYear = currentYear - 60;
+
+  if (year < minYear || (year === minYear && month < currentMonth)) return undefined;
+  if (year > currentYear || (year === currentYear && month > currentMonth)) return undefined;
+
   return `${year}-${String(month).padStart(2, '0')}-01`;
 }
 
@@ -138,7 +152,10 @@ export default function App() {
 
     const memberSince = form.memberSince.trim() ? parseMemberSince(form.memberSince) : undefined;
     if (form.memberSince.trim() && !memberSince) {
-      setSaveError('Enter card open date as MM/YYYY (e.g. 04/2023).');
+      const today = new Date();
+      const mm = String(today.getMonth() + 1).padStart(2, '0');
+      const yyyy = today.getFullYear();
+      setSaveError(`Date must be MM/YYYY, between ${mm}/${yyyy - 60} and ${mm}/${yyyy}.`);
       return;
     }
 
@@ -430,10 +447,26 @@ export default function App() {
                         placeholder="04/2023"
                         placeholderTextColor="#aeaeb2"
                         keyboardType="numeric"
-                        maxLength={7}
                         value={form.memberSince}
-                        onChangeText={(v) => setForm((f) => ({ ...f, memberSince: v }))}
+                        onChangeText={(v) => setForm((f) => ({ ...f, memberSince: formatMemberSince(v) }))}
                       />
+
+                      {selectedCard && selectedCard.benefits.length > 0 && (
+                        <>
+                          <Text style={styles.benefitsGridLabel}>Benefits</Text>
+                          <View style={styles.benefitsGrid}>
+                            {selectedCard.benefits.map((b, i) => (
+                              <View key={i} style={styles.benefitCol}>
+                                <Text style={styles.benefitColLabel}>{b.category}</Text>
+                                <View style={styles.benefitColPill}>
+                                  <FontAwesome6 name={b.icon} size={11} color="#007aff" iconStyle="solid" />
+                                  <Text style={styles.benefitColPillText}>{b.multiplier}</Text>
+                                </View>
+                              </View>
+                            ))}
+                          </View>
+                        </>
+                      )}
                     </ScrollView>
                   </View>
 
