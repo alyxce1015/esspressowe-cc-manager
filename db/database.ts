@@ -1,5 +1,14 @@
 import { supabase } from '../lib/supabase';
 
+export type Purchase = {
+  id: string;
+  cardId: string;
+  amount: number;
+  merchant: string;
+  category: 'food' | 'travel' | 'online' | 'store' | 'grocery' | 'gas';
+  date: string; // "YYYY-MM-DD"
+};
+
 export type UserCard = {
   id: string;
   catalogId: string;
@@ -84,6 +93,57 @@ export async function updateCard(card: UserCard): Promise<void> {
     .from('cards')
     .update(toRow(card))
     .eq('id', card.id);
+
+  if (error) throw new Error(error.message);
+}
+
+// ─── Purchases ───────────────────────────────────────────────────────────────
+
+function purchaseToRow(p: Purchase) {
+  return {
+    id: p.id,
+    card_id: p.cardId,
+    amount: p.amount,
+    merchant: p.merchant,
+    category: p.category,
+    date: p.date,
+  };
+}
+
+function purchaseFromRow(row: Record<string, unknown>): Purchase {
+  return {
+    id: row.id as string,
+    cardId: row.card_id as string,
+    amount: Number(row.amount),
+    merchant: row.merchant as string,
+    category: row.category as Purchase['category'],
+    date: row.date as string,
+  };
+}
+
+export async function getPurchases(): Promise<Purchase[]> {
+  const { data, error } = await supabase
+    .from('purchases')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (error) throw new Error(error.message);
+  return (data ?? []).map(purchaseFromRow);
+}
+
+export async function insertPurchase(p: Purchase): Promise<void> {
+  const { error } = await supabase
+    .from('purchases')
+    .insert(purchaseToRow(p));
+
+  if (error) throw new Error(error.message);
+}
+
+export async function deletePurchase(id: string): Promise<void> {
+  const { error } = await supabase
+    .from('purchases')
+    .delete()
+    .eq('id', id);
 
   if (error) throw new Error(error.message);
 }

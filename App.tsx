@@ -12,7 +12,7 @@ import { modalStyles } from './styles/modal';
 import { dashStyles as ds } from './styles/dashboard';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { CARD_CATALOG, ISSUERS, type CatalogCard } from './data/cards';
-import { getCards, insertCard, deleteCard, deleteCards, type UserCard } from './db/database';
+import { getCards, insertCard, deleteCard, deleteCards, getPurchases, insertPurchase, type UserCard, type Purchase } from './db/database';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -142,7 +142,59 @@ function formatRenewalDate(feeDueDate: string): string {
   });
 }
 
+function formatPurchaseAmount(input: string): string {
+  const stripped = input.replace(/[^0-9.]/g, '');
+  const parts = stripped.split('.');
+  const whole = parts[0] || '';
+  const decimal = parts.length > 1 ? '.' + parts[1].slice(0, 2) : '';
+  if (!whole && !decimal) return '';
+  return '$' + whole + decimal;
+}
+
+function parsePurchaseAmount(input: string): number {
+  const n = parseFloat(input.replace(/[^0-9.]/g, ''));
+  return isNaN(n) ? 0 : n;
+}
+
+function formatDateInput(input: string): string {
+  const digits = input.replace(/[^0-9]/g, '').slice(0, 8);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) return digits.slice(0, 2) + '/' + digits.slice(2);
+  return digits.slice(0, 2) + '/' + digits.slice(2, 4) + '/' + digits.slice(4);
+}
+
+function parseDateInput(input: string): string | undefined {
+  const match = input.trim().match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (!match) return undefined;
+  const month = parseInt(match[1], 10);
+  const day = parseInt(match[2], 10);
+  const year = parseInt(match[3], 10);
+  if (month < 1 || month > 12 || day < 1 || day > 31) return undefined;
+  const d = new Date(year, month - 1, day);
+  if (d.getMonth() !== month - 1 || d.getDate() !== day) return undefined;
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+function todayMMDDYYYY(): string {
+  const d = new Date();
+  return `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}/${d.getFullYear()}`;
+}
+
 // ─── Component ───────────────────────────────────────────────────────────────
+
+const BENEFIT_LEGEND: { icon: string; label: string; description: string }[] = [
+  { icon: 'plane',           label: 'Travel / Flights',          description: 'Airline tickets, Chase/Amex travel portals' },
+  { icon: 'hotel',           label: 'Hotels',                    description: 'Hotel stays booked directly or via portal' },
+  { icon: 'utensils',        label: 'Dining',                    description: 'Restaurants, cafes, bars, and food delivery' },
+  { icon: 'basket-shopping', label: 'Groceries',                 description: 'Supermarkets and grocery stores' },
+  { icon: 'gas-pump',        label: 'Gas Stations',              description: 'Fuel purchases at gas stations' },
+  { icon: 'cart-shopping',   label: 'Online Shopping',           description: 'Purchases made online (e.g. Amazon)' },
+  { icon: 'store',           label: 'Drugstores',                description: 'Pharmacies like CVS and Walgreens' },
+  { icon: 'house',           label: 'Rent',                      description: 'Eligible rent payments' },
+  { icon: 'arrows-rotate',   label: 'Rotating / Choice Cat.',    description: 'Categories that change quarterly or you choose' },
+  { icon: 'money-bill',      label: 'All Purchases',             description: 'Base rate on everything else' },
+];
+
 
 export default function App() {
   const [fontsLoaded] = useFonts(FontAwesome6.font);
@@ -161,6 +213,17 @@ export default function App() {
   const [deleteError, setDeleteError] = useState('');
   const [activeTab, setActiveTab] = useState<'home' | 'cards' | 'benefits' | 'more'>('home');
   const [, setTick] = useState(0);
+  const [purchases, setPurchases] = useState<Purchase[]>([]);
+  const [purchaseModalVisible, setPurchaseModalVisible] = useState(false);
+  const [purchaseForm, setPurchaseForm] = useState({
+    cardId: '',
+    amount: '',
+    merchant: '',
+    category: '' as Purchase['category'] | '',
+    date: '',
+  });
+  const [purchaseError, setPurchaseError] = useState('');
+  const [legendVisible, setLegendVisible] = useState(false);
 
   const stepAnim = useRef(new Animated.Value(1)).current;
 
@@ -168,6 +231,9 @@ export default function App() {
     getCards()
       .then(setCards)
       .catch((e) => setSaveError('Could not load cards: ' + (e instanceof Error ? e.message : String(e))));
+    getPurchases()
+      .then(setPurchases)
+      .catch(() => {}); // non-fatal — table may not exist yet
   }, []);
 
   useEffect(() => {
@@ -310,6 +376,13 @@ export default function App() {
     return sum + (isNaN(n) ? 0 : n);
   }, 0);
 
+  const spentByCard = purchases.reduce<Record<string, number>>((acc, p) => {
+    acc[p.cardId] = (acc[p.cardId] ?? 0) + p.amount;
+    return acc;
+  }, {});
+  const totalSpent = Object.values(spentByCard).reduce((sum, n) => sum + n, 0);
+  const totalAvailable = totalLimitValue - totalSpent;
+
   const totalAnnualFees = cards.reduce((sum, c) => {
     const cat = CARD_CATALOG.find(x => x.id === c.catalogId);
     return sum + (cat?.annualFee ?? 0);
@@ -339,6 +412,44 @@ export default function App() {
     setActiveTab(tab);
   }
 
+  function openPurchaseModal() {
+    setPurchaseForm({
+      cardId: cards.length === 1 ? cards[0].id : '',
+      amount: '',
+      merchant: '',
+      category: '',
+      date: todayMMDDYYYY(),
+    });
+    setPurchaseError('');
+    setPurchaseModalVisible(true);
+  }
+
+  async function savePurchase() {
+    setPurchaseError('');
+    if (!purchaseForm.cardId) { setPurchaseError('Select a card.'); return; }
+    const amount = parsePurchaseAmount(purchaseForm.amount);
+    if (!amount || amount <= 0) { setPurchaseError('Enter a valid amount.'); return; }
+    if (!purchaseForm.merchant.trim()) { setPurchaseError('Enter a merchant name.'); return; }
+    if (!purchaseForm.category) { setPurchaseError('Select a category.'); return; }
+    const date = parseDateInput(purchaseForm.date);
+    if (!date) { setPurchaseError('Enter a valid date (MM/DD/YYYY).'); return; }
+    const purchase: Purchase = {
+      id: generateUUID(),
+      cardId: purchaseForm.cardId,
+      amount,
+      merchant: purchaseForm.merchant.trim(),
+      category: purchaseForm.category as Purchase['category'],
+      date,
+    };
+    try {
+      await insertPurchase(purchase);
+      setPurchases(await getPurchases());
+      setPurchaseModalVisible(false);
+    } catch (e) {
+      setPurchaseError(e instanceof Error ? e.message : 'Could not save purchase.');
+    }
+  }
+
   return (
     <View style={{ flex: 1 }}>
       <StatusBar style={activeTab === 'home' ? 'light' : 'dark'} />
@@ -350,13 +461,15 @@ export default function App() {
           {/* Hero card */}
           <View style={ds.heroCard}>
             <View style={ds.heroLeft}>
-              <Text style={ds.heroHeading}>Total Credit Available</Text>
+              <Text style={ds.heroHeading}>Available Credit</Text>
               <Text style={ds.heroAmount}>
-                {totalLimitValue > 0 ? '$' + totalLimitValue.toLocaleString('en-US') : '—'}
+                {totalLimitValue > 0 ? '$' + Math.max(0, totalAvailable).toLocaleString('en-US') : '—'}
               </Text>
               <Text style={ds.heroSub}>
                 {cards.length > 0
-                  ? `Across ${cards.length} active card${cards.length !== 1 ? 's' : ''}`
+                  ? totalSpent > 0
+                    ? `$${totalSpent.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} spent · $${totalLimitValue.toLocaleString('en-US')} total limit`
+                    : `Across ${cards.length} active card${cards.length !== 1 ? 's' : ''}`
                   : 'No cards added yet'}
               </Text>
               {(paymentInsight || feeInsight) ? (
@@ -473,7 +586,12 @@ export default function App() {
       {activeTab === 'cards' && (
         <View style={{ flex: 1, backgroundColor: '#5a473e', paddingTop: 60, paddingHorizontal: 20 }}>
           <View style={styles.headerRow}>
-            <Text style={styles.header}>My Cards</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 6 }}>
+              <Text style={styles.header}>My Cards</Text>
+              <Pressable onPress={() => setLegendVisible(true)} hitSlop={8} style={{ marginBottom: 4 }}>
+                <FontAwesome6 name="circle-info" size={15} color="#CBB9A8" iconStyle="solid" />
+              </Pressable>
+            </View>
             {cards.length > 0 && (
               <Pressable onPress={selectMode ? exitSelectMode : enterSelectMode} hitSlop={8}>
                 <Text style={styles.selectButton}>{selectMode ? 'Cancel' : 'Select'}</Text>
@@ -527,6 +645,9 @@ export default function App() {
                               <Text style={styles.cardAgeLabel}>{getCardAge(card.memberSince)}</Text>
                             </>
                           )}
+                          {card.limit ? (
+                            <Text style={styles.cardDateOpenedLabel}>Limit: {card.limit}</Text>
+                          ) : null}
                         </View>
 
                         <View style={styles.cardInfo}>
@@ -546,11 +667,22 @@ export default function App() {
                                   </View>
                                 );
                               })()}
-                              {card.limit ? (
-                                <View style={styles.feeBadge}>
-                                  <Text style={styles.feeBadgeText}>{card.limit}</Text>
-                                </View>
-                              ) : null}
+                              {card.limit ? (() => {
+                                const limitNum = parseInt(card.limit.replace(/[^0-9]/g, ''), 10);
+                                const spent = spentByCard[card.id] ?? 0;
+                                const available = !isNaN(limitNum) && spent > 0
+                                  ? Math.max(0, limitNum - spent)
+                                  : null;
+                                return (
+                                  <View style={styles.feeBadge}>
+                                    <Text style={styles.feeBadgeText}>
+                                      {available !== null
+                                        ? `$${available.toLocaleString('en-US')}`
+                                        : card.limit}
+                                    </Text>
+                                  </View>
+                                );
+                              })() : null}
                             </View>
                           </View>
 
@@ -666,6 +798,29 @@ export default function App() {
         {([
           { key: 'home', icon: 'house', label: 'Home' },
           { key: 'cards', icon: 'credit-card', label: 'Cards' },
+        ] as const).map((tab) => {
+          const active = activeTab === tab.key;
+          return (
+            <Pressable key={tab.key} style={ds.tabItem} onPress={() => handleTabPress(tab.key)}>
+              <View style={[ds.tabIconWrap, active && ds.tabIconActive]}>
+                <FontAwesome6 name={tab.icon} size={20} color={active ? '#C08A5B' : '#CBB9A8'} iconStyle="solid" />
+              </View>
+              <Text style={[ds.tabLabel, active && ds.tabLabelActive]}>{tab.label}</Text>
+            </Pressable>
+          );
+        })}
+
+        {/* Center FAB */}
+        <View style={ds.tabCenterWrap}>
+          <Pressable
+            style={({ pressed }) => [ds.tabCenterBtn, pressed && ds.tabCenterBtnPressed]}
+            onPress={openPurchaseModal}
+          >
+            <FontAwesome6 name="plus" size={26} color="#fff" iconStyle="solid" />
+          </Pressable>
+        </View>
+
+        {([
           { key: 'benefits', icon: 'star', label: 'Benefits' },
           { key: 'more', icon: 'ellipsis', label: 'More' },
         ] as const).map((tab) => {
@@ -899,6 +1054,209 @@ export default function App() {
                 </KeyboardAvoidingView>
               )}
             </Animated.View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── ADD PURCHASE MODAL ── */}
+      <Modal visible={purchaseModalVisible} animationType="slide" transparent>
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <View style={[styles.modalSheet, { maxHeight: windowHeight * 0.88 }]}>
+            <View style={styles.dragHandle} />
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Add Purchase</Text>
+              <Pressable onPress={() => setPurchaseModalVisible(false)} hitSlop={8}>
+                <Text style={styles.closeButton}>✕</Text>
+              </Pressable>
+            </View>
+
+            <ScrollView
+              style={{ flex: 1 }}
+              contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 20 }}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              {/* Card picker */}
+              <Text style={styles.inputLabel}>Card Used</Text>
+              {cards.length === 0 ? (
+                <Text style={{ color: '#aeaeb2', fontSize: 13, marginBottom: 12 }}>No cards added yet</Text>
+              ) : (
+                <View style={{ gap: 8, marginBottom: 16 }}>
+                  {cards.map(card => (
+                    <Pressable
+                      key={card.id}
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 10,
+                        backgroundColor: purchaseForm.cardId === card.id ? 'rgba(192,138,91,0.18)' : '#2B1D17',
+                        borderRadius: 12,
+                        padding: 12,
+                        borderWidth: 1.5,
+                        borderColor: purchaseForm.cardId === card.id ? '#C08A5B' : 'transparent',
+                      }}
+                      onPress={() => setPurchaseForm(f => ({ ...f, cardId: card.id }))}
+                    >
+                      <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: card.color }} />
+                      <Text style={{ flex: 1, fontSize: 14, fontWeight: '600', color: '#F8F4EF' }} numberOfLines={1}>
+                        {card.name}
+                      </Text>
+                      {card.lastFour ? (
+                        <Text style={{ fontSize: 12, color: '#8C6E5A' }}>••{card.lastFour}</Text>
+                      ) : null}
+                      {purchaseForm.cardId === card.id && (
+                        <FontAwesome6 name="check" size={12} color="#C08A5B" iconStyle="solid" />
+                      )}
+                    </Pressable>
+                  ))}
+                </View>
+              )}
+
+              {/* Amount */}
+              <Text style={styles.inputLabel}>Amount</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="$0.00"
+                placeholderTextColor="#aeaeb2"
+                keyboardType="decimal-pad"
+                value={purchaseForm.amount}
+                onChangeText={(v) => setPurchaseForm(f => ({ ...f, amount: formatPurchaseAmount(v) }))}
+              />
+
+              {/* Merchant */}
+              <Text style={styles.inputLabel}>Merchant</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="e.g. Whole Foods"
+                placeholderTextColor="#aeaeb2"
+                value={purchaseForm.merchant}
+                onChangeText={(v) => setPurchaseForm(f => ({ ...f, merchant: v }))}
+              />
+
+              {/* Category */}
+              <Text style={styles.inputLabel}>Category</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
+                {([
+                  { key: 'food', icon: 'utensils', label: 'Food & Dining' },
+                  { key: 'grocery', icon: 'basket-shopping', label: 'Grocery' },
+                  { key: 'gas', icon: 'gas-pump', label: 'Gas' },
+                  { key: 'travel', icon: 'plane', label: 'Travel' },
+                  { key: 'online', icon: 'cart-shopping', label: 'Online' },
+                  { key: 'store', icon: 'bag-shopping', label: 'In-Store' },
+                ] as const).map(cat => {
+                  const active = purchaseForm.category === cat.key;
+                  return (
+                    <Pressable
+                      key={cat.key}
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 6,
+                        backgroundColor: active ? '#C08A5B' : '#2B1D17',
+                        borderRadius: 10,
+                        paddingHorizontal: 14,
+                        paddingVertical: 10,
+                        borderWidth: 1,
+                        borderColor: active ? '#C08A5B' : 'transparent',
+                      }}
+                      onPress={() => setPurchaseForm(f => ({ ...f, category: cat.key }))}
+                    >
+                      <FontAwesome6 name={cat.icon} size={14} color={active ? '#fff' : '#CBB9A8'} iconStyle="solid" />
+                      <Text style={{ fontSize: 13, fontWeight: '600', color: active ? '#fff' : '#CBB9A8' }}>
+                        {cat.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+
+              {/* Date */}
+              <Text style={styles.inputLabel}>Date Purchased (MM/DD/YYYY)</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="05/09/2026"
+                placeholderTextColor="#aeaeb2"
+                keyboardType="numeric"
+                value={purchaseForm.date}
+                onChangeText={(v) => setPurchaseForm(f => ({ ...f, date: formatDateInput(v) }))}
+              />
+
+              {purchaseError !== '' && (
+                <Text style={styles.saveErrorText}>{purchaseError}</Text>
+              )}
+            </ScrollView>
+
+            <View style={styles.modalButtons}>
+              <Pressable
+                style={({ pressed }) => [styles.cancelButton, pressed && styles.cancelButtonPressed]}
+                onPress={() => setPurchaseModalVisible(false)}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                style={({ pressed }) => [styles.saveButton, pressed && styles.saveButtonPressed]}
+                onPress={savePurchase}
+              >
+                <Text style={styles.saveButtonText}>Save Purchase</Text>
+              </Pressable>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* ── ICON LEGEND MODAL ── */}
+      <Modal visible={legendVisible} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalSheet, { maxHeight: windowHeight * 0.88 }]}>
+            <View style={styles.dragHandle} />
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Legend</Text>
+              <Pressable onPress={() => setLegendVisible(false)} hitSlop={8}>
+                <Text style={styles.closeButton}>✕</Text>
+              </Pressable>
+            </View>
+
+            <ScrollView
+              style={{ flex: 1 }}
+              contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 28 }}
+              showsVerticalScrollIndicator={false}
+            >
+              {/* ── Benefit Icon Legend ── */}
+              <Text style={[styles.inputLabel, { marginBottom: 10 }]}>Benefits Icons</Text>
+              <View style={{
+                backgroundColor: '#2B1D17',
+                borderRadius: 16,
+                padding: 14,
+                gap: 10,
+              }}>
+                {BENEFIT_LEGEND.map((item, i) => (
+                  <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                    <View style={{
+                      width: 34,
+                      height: 34,
+                      borderRadius: 10,
+                      backgroundColor: 'rgba(192,138,91,0.15)',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      flexShrink: 0,
+                    }}>
+                      <FontAwesome6 name={item.icon} size={15} color="#C08A5B" iconStyle="solid" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 13, fontWeight: '700', color: '#F8F4EF', marginBottom: 1 }}>
+                        {item.label}
+                      </Text>
+                      <Text style={{ fontSize: 11, color: '#8C6E5A', lineHeight: 15 }}>
+                        {item.description}
+                      </Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            </ScrollView>
           </View>
         </View>
       </Modal>

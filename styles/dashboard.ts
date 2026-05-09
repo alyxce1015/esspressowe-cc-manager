@@ -308,4 +308,27 @@ export const dashStyles = StyleSheet.create({
     color: '#C08A5B',
     fontWeight: '700',
   },
+
+  tabCenterWrap: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: -24,
+  },
+  tabCenterBtn: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#C08A5B',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#2B1D17',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.55,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  tabCenterBtnPressed: {
+    backgroundColor: '#A67445',
+  },
 });
