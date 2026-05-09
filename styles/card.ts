@@ -47,8 +47,8 @@ export const cardStyles = StyleSheet.create({
     borderColor: '#C08A5B',
   },
   trashButton: {
-    alignSelf: 'flex-start',
-    paddingTop: 2,
+    alignSelf: 'flex-end',
+    paddingBottom: 2,
     paddingLeft: 4,
   },
 
