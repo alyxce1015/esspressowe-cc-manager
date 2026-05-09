@@ -125,7 +125,7 @@ export const CARD_CATALOG: CatalogCard[] = [
   },
   {
     id: 'amex-blue-cash-preferred',
-    name: 'Amex Blue Cash Preferred',
+    name: 'American Express Blue Cash Preferred',
     issuer: 'Amex',
     image: { uri: 'https://www.nerdwallet.com/cdn-cgi/image/format=auto,width=1920,quality=80,sharpen=1/cdn/images/marketplace/credit_cards/2681330d-450d-4f71-af38-3cb16f592c02/596f22094df609999878f43629debc8d416e18334ea8f5e68f9d92a72dd0b912.jpg' },
     color: '#1a4b8c',
@@ -140,7 +140,7 @@ export const CARD_CATALOG: CatalogCard[] = [
   },
   {
     id: 'amex-blue-cash-everyday',
-    name: 'Amex Blue Cash Everyday',
+    name: 'American Express Blue Cash Everyday',
     issuer: 'Amex',
     image: { uri: 'https://www.nerdwallet.com/cdn-cgi/image/format=auto,width=1920,quality=80,sharpen=1/cdn/images/marketplace/credit_cards/5ed2eb69-5e8c-4014-b8b7-23c4d600591c/bfccadb4c5dc3dc5a88464e70bf2c7339280bf494e9c8fad0ee4e5230c465dc4.jpg' },
     color: '#1a4b8c',
