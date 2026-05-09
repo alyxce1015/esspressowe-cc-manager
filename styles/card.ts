@@ -140,6 +140,11 @@ export const cardStyles = StyleSheet.create({
     fontWeight: '600',
     color: '#1c1c1e',
   },
+  progressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   progressTrack: {
     height: 4,
     backgroundColor: '#e5e5ea',
@@ -150,6 +155,12 @@ export const cardStyles = StyleSheet.create({
     height: 4,
     backgroundColor: '#007aff',
     borderRadius: 2,
+  },
+  progressFeeLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#1c1c1e',
+    flexShrink: 0,
   },
   renewalDateText: {
     fontSize: 11,

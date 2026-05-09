@@ -293,14 +293,14 @@ export default function App() {
                 {/* Card info */}
                 <View style={styles.cardInfo}>
 
-                  {/* Name + annual fee badge */}
+                  {/* Name + credit limit badge */}
                   <View style={styles.cardNameRow}>
                     <Text style={styles.cardName} numberOfLines={1}>{card.name}</Text>
-                    <View style={styles.feeBadge}>
-                      <Text style={styles.feeBadgeText}>
-                        {annualFee === 0 ? '$0' : `$${annualFee}`}
-                      </Text>
-                    </View>
+                    {card.limit ? (
+                      <View style={styles.feeBadge}>
+                        <Text style={styles.feeBadgeText}>{card.limit}</Text>
+                      </View>
+                    ) : null}
                   </View>
 
                   {/* Last 4 */}
@@ -319,20 +319,23 @@ export default function App() {
                           {daysUntilRenewal(card.memberSince)} days remaining
                         </Text>
                       </View>
-                      <View style={styles.progressTrack}>
-                        <View
-                          style={[
-                            styles.progressFill,
-                            { width: `${Math.round(renewalProgress(card.memberSince) * 100)}%` },
-                          ]}
-                        />
+                      <View style={styles.progressRow}>
+                        <View style={[styles.progressTrack, { flex: 1 }]}>
+                          <View
+                            style={[
+                              styles.progressFill,
+                              { width: `${Math.round(renewalProgress(card.memberSince) * 100)}%` },
+                            ]}
+                          />
+                        </View>
+                        <Text style={styles.progressFeeLabel}>${annualFee}/yr</Text>
                       </View>
                       <Text style={styles.renewalDateText}>
                         {formatRenewalDate(card.memberSince)}
                       </Text>
                     </View>
                   ) : (
-                    <Text style={styles.setDateHint}>Add open date to track renewal</Text>
+                    <Text style={styles.setDateHint}>Add open date to track ${annualFee}/yr renewal</Text>
                   )}
 
                   {/* Benefit chips */}
