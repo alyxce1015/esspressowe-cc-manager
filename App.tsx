@@ -9,6 +9,7 @@ import {
 import { layoutStyles } from './styles/layout';
 import { cardStyles } from './styles/card';
 import { modalStyles } from './styles/modal';
+import { dashStyles as ds } from './styles/dashboard';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { CARD_CATALOG, ISSUERS, type CatalogCard } from './data/cards';
 import { getCards, insertCard, deleteCard, deleteCards, type UserCard } from './db/database';
@@ -158,6 +159,8 @@ export default function App() {
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [deleteError, setDeleteError] = useState('');
+  const [activeTab, setActiveTab] = useState<'home' | 'cards' | 'benefits' | 'more'>('home');
+  const [, setTick] = useState(0);
 
   const stepAnim = useRef(new Animated.Value(1)).current;
 
@@ -165,6 +168,11 @@ export default function App() {
     getCards()
       .then(setCards)
       .catch((e) => setSaveError('Could not load cards: ' + (e instanceof Error ? e.message : String(e))));
+  }, []);
+
+  useEffect(() => {
+    const id = setInterval(() => setTick(n => n + 1), 60_000);
+    return () => clearInterval(id);
   }, []);
 
   if (!fontsLoaded) return null;
@@ -296,207 +304,384 @@ export default function App() {
     return matchesSearch && matchesIssuer;
   });
 
-  return (
-    <View style={styles.container}>
-      <StatusBar style="dark" />
-      <View style={styles.headerRow}>
-        <Text style={styles.header}>My Cards</Text>
-        {cards.length > 0 && (
-          <Pressable onPress={selectMode ? exitSelectMode : enterSelectMode} hitSlop={8}>
-            <Text style={styles.selectButton}>{selectMode ? 'Cancel' : 'Select'}</Text>
-          </Pressable>
-        )}
-      </View>
+  // Dashboard computations
+  const totalLimitValue = cards.reduce((sum, c) => {
+    const n = parseInt(c.limit.replace(/[^0-9]/g, ''), 10);
+    return sum + (isNaN(n) ? 0 : n);
+  }, 0);
 
-      {deleteError !== '' && (
-        <Text style={styles.deleteErrorText}>{deleteError}</Text>
+  const totalAnnualFees = cards.reduce((sum, c) => {
+    const cat = CARD_CATALOG.find(x => x.id === c.catalogId);
+    return sum + (cat?.annualFee ?? 0);
+  }, 0);
+
+  const sortedByDue = [...cards]
+    .map(c => ({ ...c, days: daysUntilDue(c.dueDay) }))
+    .filter(c => c.days <= 15)
+    .sort((a, b) => a.days - b.days);
+
+  const feesUpcoming = cards
+    .filter((c): c is UserCard & { feeDueDate: string } => c.feeDueDate != null)
+    .map(c => ({ ...c, days: daysUntilRenewal(c.feeDueDate) }))
+    .filter(c => c.days <= 15)
+    .sort((a, b) => a.days - b.days);
+
+  const paymentInsight = sortedByDue.length > 0
+    ? `${sortedByDue[0].name} · ${sortedByDue[0].days === 0 ? 'Statement due today' : sortedByDue[0].days === 1 ? 'Statement due tomorrow' : `Statement due in ${sortedByDue[0].days} days`}`
+    : null;
+
+  const feeInsight = feesUpcoming.length > 0
+    ? `${feesUpcoming[0].name} · annual fee in ${feesUpcoming[0].days} days`
+    : null;
+
+  function handleTabPress(tab: typeof activeTab) {
+    if (tab !== 'cards') exitSelectMode();
+    setActiveTab(tab);
+  }
+
+  return (
+    <View style={{ flex: 1 }}>
+      <StatusBar style="dark" />
+
+      {/* ── HOME TAB ── */}
+      {activeTab === 'home' && (
+        <ScrollView style={ds.homeScroll} contentContainerStyle={ds.homeScrollContent} showsVerticalScrollIndicator={false}>
+
+          {/* Hero card */}
+          <View style={ds.heroCard}>
+            <View style={ds.heroLeft}>
+              <Text style={ds.heroHeading}>Total Credit Available</Text>
+              <Text style={ds.heroAmount}>
+                {totalLimitValue > 0 ? '$' + totalLimitValue.toLocaleString('en-US') : '—'}
+              </Text>
+              <Text style={ds.heroSub}>
+                {cards.length > 0
+                  ? `Across ${cards.length} active card${cards.length !== 1 ? 's' : ''}`
+                  : 'No cards added yet'}
+              </Text>
+              {(paymentInsight || feeInsight) ? (
+                <View style={{ gap: 8, alignSelf: 'center', marginTop: 16 }}>
+                  {paymentInsight && (
+                    <View style={ds.insightPill}>
+                      <FontAwesome6 name="credit-card" size={11} color="#007aff" iconStyle="solid" />
+                      <Text style={ds.insightText}>{paymentInsight}</Text>
+                    </View>
+                  )}
+                  {feeInsight && (
+                    <View style={ds.insightPill}>
+                      <FontAwesome6 name="receipt" size={11} color="#ff9500" iconStyle="solid" />
+                      <Text style={ds.insightText}>{feeInsight}</Text>
+                    </View>
+                  )}
+                </View>
+              ) : (
+                <View style={ds.insightPill}>
+                  <FontAwesome6 name="sparkles" size={11} color="#34c759" iconStyle="solid" />
+                  <Text style={ds.insightText}>Add a card to see personalized insights</Text>
+                </View>
+              )}
+            </View>
+          </View>
+
+          {/* Stats grid */}
+          <View style={ds.statsGrid}>
+            <View style={ds.statTile}>
+              <View style={[ds.statIconWrap, { backgroundColor: '#e8f0ff' }]}>
+                <FontAwesome6 name="credit-card" size={20} color="#007aff" iconStyle="solid" />
+              </View>
+              <Text style={ds.statValue}>{cards.length}</Text>
+              <Text style={ds.statLabel}>Active cards</Text>
+            </View>
+            <View style={ds.statTile}>
+              <View style={[ds.statIconWrap, { backgroundColor: '#fff3e0' }]}>
+                <FontAwesome6 name="receipt" size={20} color="#ff9500" iconStyle="solid" />
+              </View>
+              <Text style={ds.statValue}>${totalAnnualFees}</Text>
+              <Text style={ds.statLabel}>Annual fees</Text>
+            </View>
+          </View>
+
+          {/* Upcoming payments */}
+          {sortedByDue.length > 0 && (
+            <View style={ds.sectionCard}>
+              <Text style={ds.sectionTitle}>Upcoming Payments</Text>
+              {sortedByDue.map((item) => {
+                const urgent = item.days <= 10;
+                const soon = !urgent && item.days <= 15;
+                const label = item.days === 0 ? 'Today' : item.days === 1 ? 'Tomorrow' : `${item.days}d`;
+                return (
+                  <View key={item.id} style={ds.listRow}>
+                    <View style={[ds.listDot, { backgroundColor: item.color }]} />
+                    <Text style={ds.listName} numberOfLines={1}>{item.name}</Text>
+                    {urgent && (
+                      <FontAwesome6 name="triangle-exclamation" size={13} color="#ff3b30" iconStyle="solid" />
+                    )}
+                    {soon && (
+                      <FontAwesome6 name="triangle-exclamation" size={13} color="#ff9500" iconStyle="solid" />
+                    )}
+                    <Text style={[ds.listBadge, urgent && ds.listBadgeUrgent, soon && ds.listBadgeSoon]}>
+                      {label}
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
+          )}
+
+          {/* Annual fee renewals */}
+          {feesUpcoming.length > 0 && (
+            <View style={ds.sectionCard}>
+              <Text style={ds.sectionTitle}>Annual Fee Renewals</Text>
+              {feesUpcoming.map((item) => {
+                const cat = CARD_CATALOG.find(c => c.id === item.catalogId);
+                const urgent = item.days <= 10;
+                const soon = !urgent && item.days <= 15;
+                return (
+                  <View key={item.id} style={ds.listRow}>
+                    <View style={[ds.listDot, { backgroundColor: item.color }]} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={ds.listName} numberOfLines={1}>{item.name}</Text>
+                      <Text style={ds.listSub}>${cat?.annualFee}/yr · {formatRenewalDate(item.feeDueDate)}</Text>
+                    </View>
+                    {urgent && (
+                      <FontAwesome6 name="triangle-exclamation" size={13} color="#ff3b30" iconStyle="solid" />
+                    )}
+                    {soon && (
+                      <FontAwesome6 name="triangle-exclamation" size={13} color="#ff9500" iconStyle="solid" />
+                    )}
+                    <Text style={[ds.listBadge, urgent && ds.listBadgeUrgent, soon && ds.listBadgeSoon]}>
+                      {item.days}d
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
+          )}
+
+          {/* Empty state */}
+          {cards.length === 0 && (
+            <View style={ds.homeEmpty}>
+              <FontAwesome6 name="credit-card" size={44} color="#c7c7cc" iconStyle="solid" />
+              <Text style={ds.homeEmptyTitle}>No cards yet</Text>
+              <Text style={ds.homeEmptySub}>Head to the Cards tab{'\n'}to add your first card</Text>
+            </View>
+          )}
+        </ScrollView>
       )}
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {cards.length === 0 && (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyStateTitle}>No cards yet</Text>
-            <Text style={styles.emptyStateSub}>Tap + Add Card to get started</Text>
-          </View>
-        )}
-
-        <View style={[styles.cardGrid, isDesktop && styles.cardGridDesktop]}>
-          {cards.map((card) => {
-          const catalogEntry = CARD_CATALOG.find((c) => c.id === card.catalogId);
-          const imageSource = catalogEntry?.image ?? null;
-          const annualFee = catalogEntry?.annualFee ?? 0;
-          const benefits = catalogEntry?.benefits ?? [];
-
-          const isSelected = selectedIds.has(card.id);
-
-          return (
-            <View key={card.id} style={isDesktop ? styles.cardGridItem : undefined}>
-              <View style={[styles.card, isSelected && styles.cardSelected, isDesktop && { flex: 1 }]}>
-              {/* Card content — Pressable only active in select mode */}
-              <Pressable
-                style={({ pressed }) => [
-                  styles.cardInner,
-                  pressed && selectMode && styles.cardPressed,
-                ]}
-                onPress={selectMode ? () => toggleSelect(card.id) : undefined}
-              >
-                {/* Checkbox in select mode */}
-                {selectMode && (
-                  <View style={[styles.checkbox, isSelected && styles.checkboxSelected]}>
-                    {isSelected && <FontAwesome6 name="check" size={10} color="#fff" iconStyle="solid" />}
-                  </View>
-                )}
-
-                {/* Card image + opened date + age */}
-                <View style={styles.cardImageColumn}>
-                  <View style={[styles.cardImageWrap, { backgroundColor: card.color }]}>
-                    {imageSource
-                      ? <Image source={imageSource} style={styles.cardImage} resizeMode="cover" />
-                      : <Text style={styles.customCardLabel}>{card.name}</Text>
-                    }
-                  </View>
-                  {card.memberSince && (
-                    <>
-                      <Text style={styles.cardDateOpenedLabel}>{formatCardOpened(card.memberSince)}</Text>
-                      <Text style={styles.cardAgeLabel}>{getCardAge(card.memberSince)}</Text>
-                    </>
-                  )}
-                </View>
-
-                {/* Card info */}
-                <View style={styles.cardInfo}>
-
-                  {/* Name + pills */}
-                  <View style={styles.cardNameRow}>
-                    <Text style={styles.cardName} numberOfLines={1}>{card.name}</Text>
-                    <View style={styles.cardBadgeRow}>
-                      {(() => {
-                        const urgent = daysUntilDue(card.dueDay) <= 10;
-                        return (
-                          <View style={[styles.feeBadge, urgent && styles.feeBadgeUrgent]}>
-                            {urgent && (
-                              <FontAwesome6 name="triangle-exclamation" size={10} color="#ff3b30" iconStyle="solid" />
-                            )}
-                            <Text style={[styles.feeBadgeText, urgent && styles.feeBadgeTextUrgent]}>
-                              Statement Ends: {ordinal(card.dueDay)}
-                            </Text>
-                          </View>
-                        );
-                      })()}
-                      {card.limit ? (
-                        <View style={styles.feeBadge}>
-                          <Text style={styles.feeBadgeText}>{card.limit}</Text>
-                        </View>
-                      ) : null}
-                    </View>
-                  </View>
-
-                  {/* Last 4 */}
-                  <Text style={styles.cardLast4}>•••• {card.lastFour}</Text>
-
-                  {/* Annual fee section */}
-                  {annualFee === 0 ? (
-                    <View style={styles.noFeePill}>
-                      <Text style={styles.noFeePillText}>No annual fee</Text>
-                    </View>
-                  ) : card.feeDueDate ? (
-                    <View style={styles.renewalSection}>
-                      {(() => {
-                        const feeUrgent = daysUntilRenewal(card.feeDueDate) <= 10;
-                        return (
-                          <>
-                            <View style={styles.renewalRow}>
-                              <Text style={styles.renewalLabel}>Next annual fee</Text>
-                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                                {feeUrgent && (
-                                  <FontAwesome6 name="triangle-exclamation" size={10} color="#ff3b30" iconStyle="solid" />
-                                )}
-                                <Text style={[styles.daysText, feeUrgent && styles.daysTextUrgent]}>
-                                  {daysUntilRenewal(card.feeDueDate)} days remaining
-                                </Text>
-                              </View>
-                            </View>
-                            <View style={styles.progressRow}>
-                              <View style={[styles.progressTrack, { flex: 1 }]}>
-                                <View
-                                  style={[
-                                    styles.progressFill,
-                                    feeUrgent && styles.progressFillUrgent,
-                                    { width: `${Math.round(renewalProgress(card.feeDueDate) * 100)}%` },
-                                  ]}
-                                />
-                              </View>
-                              <Text style={styles.progressFeeLabel}>${annualFee}/yr</Text>
-                            </View>
-                          </>
-                        );
-                      })()}
-                      <Text style={styles.renewalDateText}>
-                        {formatRenewalDate(card.feeDueDate)}
-                      </Text>
-                    </View>
-                  ) : (
-                    <Text style={styles.setDateHint}>Add fee due date to track ${annualFee}/yr renewal</Text>
-                  )}
-
-                  {/* Benefit chips */}
-                  {benefits.length > 0 && (
-                    <View style={styles.benefitsRow}>
-                      {benefits.slice(0, 3).map((b, i) => (
-                        <View key={i} style={styles.benefitChip}>
-                          <FontAwesome6 name={b.icon} size={10} color="#6c6c70" iconStyle="solid" />
-                          <Text style={styles.benefitChipText}> {b.multiplier}</Text>
-                        </View>
-                      ))}
-                    </View>
-                  )}
-                </View>
+      {/* ── CARDS TAB ── */}
+      {activeTab === 'cards' && (
+        <View style={{ flex: 1, backgroundColor: '#f2f2f7', paddingTop: 60, paddingHorizontal: 20 }}>
+          <View style={styles.headerRow}>
+            <Text style={styles.header}>My Cards</Text>
+            {cards.length > 0 && (
+              <Pressable onPress={selectMode ? exitSelectMode : enterSelectMode} hitSlop={8}>
+                <Text style={styles.selectButton}>{selectMode ? 'Cancel' : 'Select'}</Text>
               </Pressable>
+            )}
+          </View>
 
-              {/* Trash button — sibling to content, not nested inside it */}
-              {!selectMode && (
-                <Pressable style={styles.trashButton} onPress={() => handleDeleteOne(card.id)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                  {({ hovered, pressed }: { hovered?: boolean; pressed: boolean }) => (
-                    <FontAwesome6 name="trash" size={14} color={hovered || pressed ? '#ff0000' : '#ff3b30'} iconStyle="solid" />
-                  )}
-                </Pressable>
-              )}
+          {deleteError !== '' && (
+            <Text style={styles.deleteErrorText}>{deleteError}</Text>
+          )}
+
+          <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+            {cards.length === 0 && (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyStateTitle}>No cards yet</Text>
+                <Text style={styles.emptyStateSub}>Tap + Add Card to get started</Text>
               </View>
+            )}
+
+            <View style={[styles.cardGrid, isDesktop && styles.cardGridDesktop]}>
+              {cards.map((card) => {
+                const catalogEntry = CARD_CATALOG.find((c) => c.id === card.catalogId);
+                const imageSource = catalogEntry?.image ?? null;
+                const annualFee = catalogEntry?.annualFee ?? 0;
+                const benefits = catalogEntry?.benefits ?? [];
+                const isSelected = selectedIds.has(card.id);
+
+                return (
+                  <View key={card.id} style={isDesktop ? styles.cardGridItem : undefined}>
+                    <View style={[styles.card, isSelected && styles.cardSelected, isDesktop && { flex: 1 }]}>
+                      <Pressable
+                        style={({ pressed }) => [styles.cardInner, pressed && selectMode && styles.cardPressed]}
+                        onPress={selectMode ? () => toggleSelect(card.id) : undefined}
+                      >
+                        {selectMode && (
+                          <View style={[styles.checkbox, isSelected && styles.checkboxSelected]}>
+                            {isSelected && <FontAwesome6 name="check" size={10} color="#fff" iconStyle="solid" />}
+                          </View>
+                        )}
+
+                        <View style={styles.cardImageColumn}>
+                          <View style={[styles.cardImageWrap, { backgroundColor: card.color }]}>
+                            {imageSource
+                              ? <Image source={imageSource} style={styles.cardImage} resizeMode="cover" />
+                              : <Text style={styles.customCardLabel}>{card.name}</Text>
+                            }
+                          </View>
+                          {card.memberSince && (
+                            <>
+                              <Text style={styles.cardDateOpenedLabel}>{formatCardOpened(card.memberSince)}</Text>
+                              <Text style={styles.cardAgeLabel}>{getCardAge(card.memberSince)}</Text>
+                            </>
+                          )}
+                        </View>
+
+                        <View style={styles.cardInfo}>
+                          <View style={styles.cardNameRow}>
+                            <Text style={styles.cardName} numberOfLines={1}>{card.name}</Text>
+                            <View style={styles.cardBadgeRow}>
+                              {(() => {
+                                const urgent = daysUntilDue(card.dueDay) <= 10;
+                                return (
+                                  <View style={[styles.feeBadge, urgent && styles.feeBadgeUrgent]}>
+                                    {urgent && (
+                                      <FontAwesome6 name="triangle-exclamation" size={10} color="#ff3b30" iconStyle="solid" />
+                                    )}
+                                    <Text style={[styles.feeBadgeText, urgent && styles.feeBadgeTextUrgent]}>
+                                      Statement Ends: {ordinal(card.dueDay)}
+                                    </Text>
+                                  </View>
+                                );
+                              })()}
+                              {card.limit ? (
+                                <View style={styles.feeBadge}>
+                                  <Text style={styles.feeBadgeText}>{card.limit}</Text>
+                                </View>
+                              ) : null}
+                            </View>
+                          </View>
+
+                          <Text style={styles.cardLast4}>•••• {card.lastFour}</Text>
+
+                          {annualFee === 0 ? (
+                            <View style={styles.noFeePill}>
+                              <Text style={styles.noFeePillText}>No annual fee</Text>
+                            </View>
+                          ) : card.feeDueDate ? (
+                            <View style={styles.renewalSection}>
+                              {(() => {
+                                const feeUrgent = daysUntilRenewal(card.feeDueDate) <= 10;
+                                return (
+                                  <>
+                                    <View style={styles.renewalRow}>
+                                      <Text style={styles.renewalLabel}>Next annual fee</Text>
+                                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                        {feeUrgent && (
+                                          <FontAwesome6 name="triangle-exclamation" size={10} color="#ff3b30" iconStyle="solid" />
+                                        )}
+                                        <Text style={[styles.daysText, feeUrgent && styles.daysTextUrgent]}>
+                                          {daysUntilRenewal(card.feeDueDate)} days remaining
+                                        </Text>
+                                      </View>
+                                    </View>
+                                    <View style={styles.progressRow}>
+                                      <View style={[styles.progressTrack, { flex: 1 }]}>
+                                        <View
+                                          style={[
+                                            styles.progressFill,
+                                            feeUrgent && styles.progressFillUrgent,
+                                            { width: `${Math.round(renewalProgress(card.feeDueDate) * 100)}%` },
+                                          ]}
+                                        />
+                                      </View>
+                                      <Text style={styles.progressFeeLabel}>${annualFee}/yr</Text>
+                                    </View>
+                                  </>
+                                );
+                              })()}
+                              <Text style={styles.renewalDateText}>{formatRenewalDate(card.feeDueDate)}</Text>
+                            </View>
+                          ) : (
+                            <Text style={styles.setDateHint}>Add fee due date to track ${annualFee}/yr renewal</Text>
+                          )}
+
+                          {benefits.length > 0 && (
+                            <View style={styles.benefitsRow}>
+                              {benefits.slice(0, 3).map((b, i) => (
+                                <View key={i} style={styles.benefitChip}>
+                                  <FontAwesome6 name={b.icon} size={10} color="#6c6c70" iconStyle="solid" />
+                                  <Text style={styles.benefitChipText}> {b.multiplier}</Text>
+                                </View>
+                              ))}
+                            </View>
+                          )}
+                        </View>
+                      </Pressable>
+
+                      {!selectMode && (
+                        <Pressable style={styles.trashButton} onPress={() => handleDeleteOne(card.id)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                          {({ hovered, pressed }: { hovered?: boolean; pressed: boolean }) => (
+                            <FontAwesome6 name="trash" size={14} color={hovered || pressed ? '#ff0000' : '#ff3b30'} iconStyle="solid" />
+                          )}
+                        </Pressable>
+                      )}
+                    </View>
+                  </View>
+                );
+              })}
             </View>
+          </ScrollView>
+
+          {selectMode ? (
+            <View style={[styles.selectModeBar, { marginBottom: 10 }]}>
+              <Text style={styles.selectedCount}>
+                {selectedIds.size === 0 ? 'Tap cards to select' : `${selectedIds.size} selected`}
+              </Text>
+              <TouchableOpacity
+                style={[styles.deleteSelectedButton, selectedIds.size === 0 && styles.deleteSelectedButtonDisabled]}
+                onPress={handleDeleteSelected}
+                disabled={selectedIds.size === 0}
+                activeOpacity={0.75}
+              >
+                <Text style={[styles.deleteSelectedText, selectedIds.size === 0 && styles.deleteSelectedTextDisabled]}>
+                  {selectedIds.size > 0 ? `Remove (${selectedIds.size})` : 'Remove'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <Pressable
+              style={({ pressed }) => [styles.addButton, { marginBottom: 10 }, pressed && styles.addButtonPressed]}
+              onPress={openModal}
+            >
+              <Text style={styles.addButtonText}>+ Add Card</Text>
+            </Pressable>
+          )}
+        </View>
+      )}
+
+      {/* ── BENEFITS / MORE placeholders ── */}
+      {(activeTab === 'benefits' || activeTab === 'more') && (
+        <View style={ds.placeholder}>
+          <Text style={ds.placeholderText}>
+            {activeTab === 'benefits' ? 'Benefits — Coming Soon' : 'More — Coming Soon'}
+          </Text>
+        </View>
+      )}
+
+      {/* ── BOTTOM TAB BAR ── */}
+      <View style={ds.tabBar}>
+        {([
+          { key: 'home', icon: 'house', label: 'Home' },
+          { key: 'cards', icon: 'credit-card', label: 'Cards' },
+          { key: 'benefits', icon: 'star', label: 'Benefits' },
+          { key: 'more', icon: 'ellipsis', label: 'More' },
+        ] as const).map((tab) => {
+          const active = activeTab === tab.key;
+          return (
+            <Pressable key={tab.key} style={ds.tabItem} onPress={() => handleTabPress(tab.key)}>
+              <View style={[ds.tabIconWrap, active && ds.tabIconActive]}>
+                <FontAwesome6 name={tab.icon} size={20} color={active ? '#007aff' : '#aeaeb2'} iconStyle="solid" />
+              </View>
+              <Text style={[ds.tabLabel, active && ds.tabLabelActive]}>{tab.label}</Text>
+            </Pressable>
           );
         })}
-        </View>
-      </ScrollView>
+      </View>
 
-      {selectMode ? (
-        <View style={styles.selectModeBar}>
-          <Text style={styles.selectedCount}>
-            {selectedIds.size === 0 ? 'Tap cards to select' : `${selectedIds.size} selected`}
-          </Text>
-          <TouchableOpacity
-            style={[
-              styles.deleteSelectedButton,
-              selectedIds.size === 0 && styles.deleteSelectedButtonDisabled,
-            ]}
-            onPress={handleDeleteSelected}
-            disabled={selectedIds.size === 0}
-            activeOpacity={0.75}
-          >
-            <Text style={[styles.deleteSelectedText, selectedIds.size === 0 && styles.deleteSelectedTextDisabled]}>
-              {selectedIds.size > 0 ? `Remove (${selectedIds.size})` : 'Remove'}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      ) : (
-        <Pressable
-          style={({ pressed }) => [styles.addButton, pressed && styles.addButtonPressed]}
-          onPress={openModal}
-        >
-          <Text style={styles.addButtonText}>+ Add Card</Text>
-        </Pressable>
-      )}
-
-      {/* ── Add Card Modal ── */}
+      {/* ── ADD CARD MODAL ── */}
       <Modal visible={modalVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalSheet, { height: windowHeight * 0.92 }]}>
@@ -576,7 +761,6 @@ export default function App() {
                   </View>
 
                   <View style={styles.detailsRow}>
-                    {/* Left: card thumb + name */}
                     <View style={styles.detailsLeft}>
                       <View style={[styles.detailThumb, { backgroundColor: selectedCard?.color }]}>
                         {selectedCard?.image
@@ -601,7 +785,6 @@ export default function App() {
                       )}
                     </View>
 
-                    {/* Right: inputs */}
                     <ScrollView
                       style={styles.detailsRight}
                       showsVerticalScrollIndicator={false}
