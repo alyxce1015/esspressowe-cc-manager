@@ -24,56 +24,110 @@ function generateUUID(): string {
   });
 }
 
+function ordinal(n: number): string {
+  const v = n % 100;
+  const suffix = v >= 11 && v <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] ?? 'th';
+  return `${n}${suffix}`;
+}
+
+function daysUntilDue(dueDay: number): number {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  let due = new Date(today.getFullYear(), today.getMonth(), dueDay);
+  due.setHours(0, 0, 0, 0);
+  if (due < today) due = new Date(today.getFullYear(), today.getMonth() + 1, dueDay);
+  return Math.ceil((due.getTime() - today.getTime()) / 86400000);
+}
+
 function formatCurrency(input: string): string {
   const digits = input.replace(/[^0-9]/g, '');
   if (!digits) return '';
   return '$' + parseInt(digits, 10).toLocaleString('en-US');
 }
 
+// Card Opened field (no-fee cards) — MM/YYYY input helpers
 function formatMemberSince(input: string): string {
   const digits = input.replace(/[^0-9]/g, '').slice(0, 6);
   if (digits.length <= 2) return digits;
   return digits.slice(0, 2) + '/' + digits.slice(2);
 }
 
-// Parses "MM/YYYY" → "YYYY-MM-01", returns undefined if invalid or out of range
 function parseMemberSince(input: string): string | undefined {
   const match = input.trim().match(/^(\d{1,2})\/(\d{4})$/);
   if (!match) return undefined;
   const month = parseInt(match[1], 10);
   const year = parseInt(match[2], 10);
   if (month < 1 || month > 12) return undefined;
-
   const today = new Date();
   const currentYear = today.getFullYear();
   const currentMonth = today.getMonth() + 1;
   const minYear = currentYear - 60;
-
-  if (year < minYear || (year === minYear && month < currentMonth)) return undefined;
-  if (year > currentYear || (year === currentYear && month > currentMonth)) return undefined;
-
+  if (year < minYear || year > currentYear) return undefined;
+  if (year === currentYear && month > currentMonth) return undefined;
   return `${year}-${String(month).padStart(2, '0')}-01`;
 }
 
-function nextRenewalDate(memberSince: string): Date {
-  const since = new Date(memberSince + 'T00:00:00');
+function formatCardOpened(memberSince: string): string {
+  const d = new Date(memberSince + 'T00:00:00');
+  return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+}
+
+function getCardAge(memberSince: string): string {
+  const opened = new Date(memberSince + 'T00:00:00');
+  const today = new Date();
+  const totalMonths = (today.getFullYear() - opened.getFullYear()) * 12 + (today.getMonth() - opened.getMonth());
+  if (totalMonths < 1) return '< 1 mo old';
+  if (totalMonths < 12) return `${totalMonths} mo old`;
+  const years = Math.floor(totalMonths / 12);
+  const months = totalMonths % 12;
+  if (months === 0) return `${years} yr${years > 1 ? 's' : ''} old`;
+  return `${years} yr${years > 1 ? 's' : ''} ${months} mo old`;
+}
+
+// Fee Due Date field (annual-fee cards) — MM/DD/YYYY input helpers
+function formatFeeDueDateInput(input: string): string {
+  const digits = input.replace(/[^0-9]/g, '').slice(0, 4);
+  if (digits.length <= 2) return digits;
+  return digits.slice(0, 2) + '/' + digits.slice(2);
+}
+
+function parseFeeDueDate(input: string): string | undefined {
+  const match = input.trim().match(/^(\d{2})\/(\d{2})$/);
+  if (!match) return undefined;
+  const month = parseInt(match[1], 10);
+  const day = parseInt(match[2], 10);
+  if (month < 1 || month > 12 || day < 1 || day > 31) return undefined;
+  // Validate the day exists in that month (use a leap year so Feb 29 is valid)
+  const d = new Date(2000, month - 1, day);
+  if (d.getMonth() !== month - 1 || d.getDate() !== day) return undefined;
+  return `2000-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+// Annual fee renewal tracking — based on exact fee due date
+function nextRenewalDate(feeDueDate: string): Date {
+  const due = new Date(feeDueDate + 'T00:00:00');
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  let renewal = new Date(today.getFullYear(), since.getMonth(), since.getDate());
-  if (renewal <= today) renewal = new Date(today.getFullYear() + 1, since.getMonth(), since.getDate());
+  let renewal = new Date(due);
+  renewal.setFullYear(today.getFullYear());
+  renewal.setHours(0, 0, 0, 0);
+  if (renewal < today) {
+    renewal.setFullYear(today.getFullYear() + 1);
+    renewal.setHours(0, 0, 0, 0);
+  }
   return renewal;
 }
 
-function daysUntilRenewal(memberSince: string): number {
+function daysUntilRenewal(feeDueDate: string): number {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  return Math.ceil((nextRenewalDate(memberSince).getTime() - today.getTime()) / 86400000);
+  return Math.ceil((nextRenewalDate(feeDueDate).getTime() - today.getTime()) / 86400000);
 }
 
-function renewalProgress(memberSince: string): number {
+function renewalProgress(feeDueDate: string): number {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const renewal = nextRenewalDate(memberSince);
+  const renewal = nextRenewalDate(feeDueDate);
   const prev = new Date(renewal);
   prev.setFullYear(prev.getFullYear() - 1);
   const total = renewal.getTime() - prev.getTime();
@@ -81,8 +135,8 @@ function renewalProgress(memberSince: string): number {
   return Math.max(0, Math.min(1, elapsed / total));
 }
 
-function formatRenewalDate(memberSince: string): string {
-  return nextRenewalDate(memberSince).toLocaleDateString('en-US', {
+function formatRenewalDate(feeDueDate: string): string {
+  return nextRenewalDate(feeDueDate).toLocaleDateString('en-US', {
     month: 'short', day: 'numeric', year: 'numeric',
   });
 }
@@ -99,7 +153,7 @@ export default function App() {
   const [selectedCard, setSelectedCard] = useState<CatalogCard | null>(null);
   const [search, setSearch] = useState('');
   const [issuerFilter, setIssuerFilter] = useState('All');
-  const [form, setForm] = useState({ customName: '', lastFour: '', dueDay: '', limit: '', memberSince: '' });
+  const [form, setForm] = useState({ customName: '', lastFour: '', dueDay: '', limit: '', memberSince: '', feeDueDate: '' });
   const [saveError, setSaveError] = useState('');
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -163,7 +217,7 @@ export default function App() {
     setSelectedCard(null);
     setSearch('');
     setIssuerFilter('All');
-    setForm({ customName: '', lastFour: '', dueDay: '', limit: '', memberSince: '' });
+    setForm({ customName: '', lastFour: '', dueDay: '', limit: '', memberSince: '', feeDueDate: '' });
     setSaveError('');
     stepAnim.setValue(1);
     setModalVisible(true);
@@ -197,12 +251,22 @@ export default function App() {
     const name = selectedCard.id === 'custom' ? form.customName.trim() : selectedCard.name;
     if (!name) { setSaveError('Card name is required.'); return; }
 
+    const hasFee = selectedCard.annualFee > 0;
+
+    // All cards: validate Card Opened (MM/YYYY)
     const memberSince = form.memberSince.trim() ? parseMemberSince(form.memberSince) : undefined;
     if (form.memberSince.trim() && !memberSince) {
       const today = new Date();
       const mm = String(today.getMonth() + 1).padStart(2, '0');
       const yyyy = today.getFullYear();
       setSaveError(`Date must be MM/YYYY, between ${mm}/${yyyy - 60} and ${mm}/${yyyy}.`);
+      return;
+    }
+
+    // Fee cards: validate Fee Due Date (MM/DD/YYYY)
+    const feeDueDate = hasFee && form.feeDueDate.trim() ? parseFeeDueDate(form.feeDueDate) : undefined;
+    if (hasFee && form.feeDueDate.trim() && !feeDueDate) {
+      setSaveError('Enter a valid fee due date (MM/DD/YYYY).');
       return;
     }
 
@@ -217,6 +281,7 @@ export default function App() {
         imageUrl: '',
         color: selectedCard.color,
         memberSince,
+        feeDueDate,
       });
       setCards(await getCards());
       setModalVisible(false);
@@ -266,7 +331,7 @@ export default function App() {
 
           return (
             <View key={card.id} style={isDesktop ? styles.cardGridItem : undefined}>
-              <View style={[styles.card, isSelected && styles.cardSelected]}>
+              <View style={[styles.card, isSelected && styles.cardSelected, isDesktop && { flex: 1 }]}>
               {/* Card content — Pressable only active in select mode */}
               <Pressable
                 style={({ pressed }) => [
@@ -282,25 +347,48 @@ export default function App() {
                   </View>
                 )}
 
-                {/* Card image */}
-                <View style={[styles.cardImageWrap, { backgroundColor: card.color }]}>
-                  {imageSource
-                    ? <Image source={imageSource} style={styles.cardImage} resizeMode="cover" />
-                    : <Text style={styles.customCardLabel}>{card.name}</Text>
-                  }
+                {/* Card image + opened date + age */}
+                <View style={styles.cardImageColumn}>
+                  <View style={[styles.cardImageWrap, { backgroundColor: card.color }]}>
+                    {imageSource
+                      ? <Image source={imageSource} style={styles.cardImage} resizeMode="cover" />
+                      : <Text style={styles.customCardLabel}>{card.name}</Text>
+                    }
+                  </View>
+                  {card.memberSince && (
+                    <>
+                      <Text style={styles.cardDateOpenedLabel}>{formatCardOpened(card.memberSince)}</Text>
+                      <Text style={styles.cardAgeLabel}>{getCardAge(card.memberSince)}</Text>
+                    </>
+                  )}
                 </View>
 
                 {/* Card info */}
                 <View style={styles.cardInfo}>
 
-                  {/* Name + credit limit badge */}
+                  {/* Name + pills */}
                   <View style={styles.cardNameRow}>
                     <Text style={styles.cardName} numberOfLines={1}>{card.name}</Text>
-                    {card.limit ? (
-                      <View style={styles.feeBadge}>
-                        <Text style={styles.feeBadgeText}>{card.limit}</Text>
-                      </View>
-                    ) : null}
+                    <View style={styles.cardBadgeRow}>
+                      {(() => {
+                        const urgent = daysUntilDue(card.dueDay) <= 10;
+                        return (
+                          <View style={[styles.feeBadge, urgent && styles.feeBadgeUrgent]}>
+                            {urgent && (
+                              <FontAwesome6 name="triangle-exclamation" size={10} color="#ff3b30" iconStyle="solid" />
+                            )}
+                            <Text style={[styles.feeBadgeText, urgent && styles.feeBadgeTextUrgent]}>
+                              Statement Ends: {ordinal(card.dueDay)}
+                            </Text>
+                          </View>
+                        );
+                      })()}
+                      {card.limit ? (
+                        <View style={styles.feeBadge}>
+                          <Text style={styles.feeBadgeText}>{card.limit}</Text>
+                        </View>
+                      ) : null}
+                    </View>
                   </View>
 
                   {/* Last 4 */}
@@ -311,31 +399,44 @@ export default function App() {
                     <View style={styles.noFeePill}>
                       <Text style={styles.noFeePillText}>No annual fee</Text>
                     </View>
-                  ) : card.memberSince ? (
+                  ) : card.feeDueDate ? (
                     <View style={styles.renewalSection}>
-                      <View style={styles.renewalRow}>
-                        <Text style={styles.renewalLabel}>Next annual fee</Text>
-                        <Text style={styles.daysText}>
-                          {daysUntilRenewal(card.memberSince)} days remaining
-                        </Text>
-                      </View>
-                      <View style={styles.progressRow}>
-                        <View style={[styles.progressTrack, { flex: 1 }]}>
-                          <View
-                            style={[
-                              styles.progressFill,
-                              { width: `${Math.round(renewalProgress(card.memberSince) * 100)}%` },
-                            ]}
-                          />
-                        </View>
-                        <Text style={styles.progressFeeLabel}>${annualFee}/yr</Text>
-                      </View>
+                      {(() => {
+                        const feeUrgent = daysUntilRenewal(card.feeDueDate) <= 10;
+                        return (
+                          <>
+                            <View style={styles.renewalRow}>
+                              <Text style={styles.renewalLabel}>Next annual fee</Text>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                {feeUrgent && (
+                                  <FontAwesome6 name="triangle-exclamation" size={10} color="#ff3b30" iconStyle="solid" />
+                                )}
+                                <Text style={[styles.daysText, feeUrgent && styles.daysTextUrgent]}>
+                                  {daysUntilRenewal(card.feeDueDate)} days remaining
+                                </Text>
+                              </View>
+                            </View>
+                            <View style={styles.progressRow}>
+                              <View style={[styles.progressTrack, { flex: 1 }]}>
+                                <View
+                                  style={[
+                                    styles.progressFill,
+                                    feeUrgent && styles.progressFillUrgent,
+                                    { width: `${Math.round(renewalProgress(card.feeDueDate) * 100)}%` },
+                                  ]}
+                                />
+                              </View>
+                              <Text style={styles.progressFeeLabel}>${annualFee}/yr</Text>
+                            </View>
+                          </>
+                        );
+                      })()}
                       <Text style={styles.renewalDateText}>
-                        {formatRenewalDate(card.memberSince)}
+                        {formatRenewalDate(card.feeDueDate)}
                       </Text>
                     </View>
                   ) : (
-                    <Text style={styles.setDateHint}>Add open date to track ${annualFee}/yr renewal</Text>
+                    <Text style={styles.setDateHint}>Add fee due date to track ${annualFee}/yr renewal</Text>
                   )}
 
                   {/* Benefit chips */}
@@ -560,6 +661,20 @@ export default function App() {
                         value={form.memberSince}
                         onChangeText={(v) => setForm((f) => ({ ...f, memberSince: formatMemberSince(v) }))}
                       />
+
+                      {selectedCard && selectedCard.annualFee > 0 && (
+                        <>
+                          <Text style={styles.inputLabel}>Fee Due Date (MM/DD)</Text>
+                          <TextInput
+                            style={styles.input}
+                            placeholder="05/09"
+                            placeholderTextColor="#aeaeb2"
+                            keyboardType="numeric"
+                            value={form.feeDueDate}
+                            onChangeText={(v) => setForm((f) => ({ ...f, feeDueDate: formatFeeDueDateInput(v) }))}
+                          />
+                        </>
+                      )}
 
                       {selectedCard && selectedCard.benefits.length > 0 && (
                         <>

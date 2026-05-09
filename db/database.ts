@@ -9,7 +9,8 @@ export type UserCard = {
   limit: string;
   imageUrl: string;
   color: string;
-  memberSince?: string; // ISO "YYYY-MM-DD", optional — add member_since column in Supabase to enable renewal tracking
+  memberSince?: string;  // "YYYY-MM-01" — card opened month, shown on no-fee cards
+  feeDueDate?: string;   // "YYYY-MM-DD" — exact annual fee due date, for fee cards
 };
 
 function toRow(card: UserCard) {
@@ -23,6 +24,7 @@ function toRow(card: UserCard) {
     image_url: card.imageUrl,
     color: card.color,
     ...(card.memberSince !== undefined && { member_since: card.memberSince }),
+    ...(card.feeDueDate !== undefined && { fee_due_date: card.feeDueDate }),
   };
 }
 
@@ -37,6 +39,7 @@ function fromRow(row: Record<string, unknown>): UserCard {
     imageUrl: row.image_url as string,
     color: row.color as string,
     memberSince: (row.member_since as string | null | undefined) ?? undefined,
+    feeDueDate: (row.fee_due_date as string | null | undefined) ?? undefined,
   };
 }
 

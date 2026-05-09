@@ -53,6 +53,11 @@ export const cardStyles = StyleSheet.create({
   },
 
 
+  cardImageColumn: {
+    alignItems: 'center',
+    flexShrink: 0,
+    gap: 3,
+  },
   cardImageWrap: {
     width: 90,
     height: 57,
@@ -60,8 +65,18 @@ export const cardStyles = StyleSheet.create({
     overflow: 'hidden',
     justifyContent: 'center',
     alignItems: 'center',
-    flexShrink: 0,
     marginTop: 2,
+  },
+  cardDateOpenedLabel: {
+    fontSize: 9,
+    color: '#aeaeb2',
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  cardAgeLabel: {
+    fontSize: 9,
+    color: '#c7c7cc',
+    textAlign: 'center',
   },
   cardImage: {
     width: '100%',
@@ -91,17 +106,33 @@ export const cardStyles = StyleSheet.create({
     fontWeight: '600',
     color: '#1c1c1e',
   },
+  cardBadgeRow: {
+    flexDirection: 'row',
+    gap: 6,
+    flexShrink: 0,
+  },
   feeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
     backgroundColor: '#007aff',
     borderRadius: 20,
     paddingHorizontal: 10,
     paddingVertical: 4,
     flexShrink: 0,
   },
+  feeBadgeUrgent: {
+    backgroundColor: '#fff0f0',
+    borderWidth: 1,
+    borderColor: '#ff3b30',
+  },
   feeBadgeText: {
     color: '#ffffff',
     fontSize: 12,
     fontWeight: '700',
+  },
+  feeBadgeTextUrgent: {
+    color: '#ff3b30',
   },
   cardLast4: {
     fontSize: 12,
@@ -156,6 +187,12 @@ export const cardStyles = StyleSheet.create({
     backgroundColor: '#007aff',
     borderRadius: 2,
   },
+  progressFillUrgent: {
+    backgroundColor: '#ff3b30',
+  },
+  daysTextUrgent: {
+    color: '#ff3b30',
+  },
   progressFeeLabel: {
     fontSize: 11,
     fontWeight: '700',
@@ -171,6 +208,11 @@ export const cardStyles = StyleSheet.create({
     color: '#c7c7cc',
     marginTop: 2,
     fontStyle: 'italic',
+  },
+  cardOpenedText: {
+    fontSize: 11,
+    color: '#aeaeb2',
+    marginTop: 2,
   },
 
   benefitsRow: {
