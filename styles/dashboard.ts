@@ -1,6 +1,15 @@
 import { StyleSheet, Platform } from 'react-native';
 
 export const dashStyles = StyleSheet.create({
+  appTitle: {
+    fontSize: 32,
+    fontWeight: '800',
+    color: '#F4EDE4',
+    letterSpacing: -0.5,
+    paddingTop: 4,
+    textAlign: 'center',
+  },
+
   // Home scroll — Dark Espresso as the main canvas
   homeScroll: {
     flex: 1,

@@ -527,6 +527,9 @@ export default function App() {
       {activeTab === 'home' && (
         <ScrollView style={ds.homeScroll} contentContainerStyle={ds.homeScrollContent} showsVerticalScrollIndicator={false}>
 
+          {/* App title */}
+          <Text style={ds.appTitle}>Esspressowe</Text>
+
           {/* Hero card */}
           <View style={ds.heroCard}>
             <View style={ds.heroLeft}>
