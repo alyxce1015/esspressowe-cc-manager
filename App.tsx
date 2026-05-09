@@ -341,7 +341,7 @@ export default function App() {
 
   return (
     <View style={{ flex: 1 }}>
-      <StatusBar style="dark" />
+      <StatusBar style={activeTab === 'home' ? 'light' : 'dark'} />
 
       {/* ── HOME TAB ── */}
       {activeTab === 'home' && (
@@ -363,20 +363,20 @@ export default function App() {
                 <View style={{ gap: 8, alignSelf: 'center', marginTop: 16 }}>
                   {paymentInsight && (
                     <View style={ds.insightPill}>
-                      <FontAwesome6 name="credit-card" size={11} color="#007aff" iconStyle="solid" />
+                      <FontAwesome6 name="credit-card" size={11} color="#C08A5B" iconStyle="solid" />
                       <Text style={ds.insightText}>{paymentInsight}</Text>
                     </View>
                   )}
                   {feeInsight && (
                     <View style={ds.insightPill}>
-                      <FontAwesome6 name="receipt" size={11} color="#ff9500" iconStyle="solid" />
+                      <FontAwesome6 name="receipt" size={11} color="#D4A373" iconStyle="solid" />
                       <Text style={ds.insightText}>{feeInsight}</Text>
                     </View>
                   )}
                 </View>
               ) : (
                 <View style={ds.insightPill}>
-                  <FontAwesome6 name="sparkles" size={11} color="#34c759" iconStyle="solid" />
+                  <FontAwesome6 name="sparkles" size={11} color="#7A9E7E" iconStyle="solid" />
                   <Text style={ds.insightText}>Add a card to see personalized insights</Text>
                 </View>
               )}
@@ -386,15 +386,15 @@ export default function App() {
           {/* Stats grid */}
           <View style={ds.statsGrid}>
             <View style={ds.statTile}>
-              <View style={[ds.statIconWrap, { backgroundColor: '#e8f0ff' }]}>
-                <FontAwesome6 name="credit-card" size={20} color="#007aff" iconStyle="solid" />
+              <View style={[ds.statIconWrap, { backgroundColor: 'rgba(192,138,91,0.15)' }]}>
+                <FontAwesome6 name="credit-card" size={20} color="#C08A5B" iconStyle="solid" />
               </View>
               <Text style={ds.statValue}>{cards.length}</Text>
               <Text style={ds.statLabel}>Active cards</Text>
             </View>
             <View style={ds.statTile}>
-              <View style={[ds.statIconWrap, { backgroundColor: '#fff3e0' }]}>
-                <FontAwesome6 name="receipt" size={20} color="#ff9500" iconStyle="solid" />
+              <View style={[ds.statIconWrap, { backgroundColor: 'rgba(122,158,126,0.15)' }]}>
+                <FontAwesome6 name="receipt" size={20} color="#7A9E7E" iconStyle="solid" />
               </View>
               <Text style={ds.statValue}>${totalAnnualFees}</Text>
               <Text style={ds.statLabel}>Annual fees</Text>
@@ -461,7 +461,7 @@ export default function App() {
           {/* Empty state */}
           {cards.length === 0 && (
             <View style={ds.homeEmpty}>
-              <FontAwesome6 name="credit-card" size={44} color="#c7c7cc" iconStyle="solid" />
+              <FontAwesome6 name="credit-card" size={44} color="#CBB9A8" iconStyle="solid" />
               <Text style={ds.homeEmptyTitle}>No cards yet</Text>
               <Text style={ds.homeEmptySub}>Head to the Cards tab{'\n'}to add your first card</Text>
             </View>
@@ -471,7 +471,7 @@ export default function App() {
 
       {/* ── CARDS TAB ── */}
       {activeTab === 'cards' && (
-        <View style={{ flex: 1, backgroundColor: '#f2f2f7', paddingTop: 60, paddingHorizontal: 20 }}>
+        <View style={{ flex: 1, backgroundColor: '#5a473e', paddingTop: 60, paddingHorizontal: 20 }}>
           <View style={styles.headerRow}>
             <Text style={styles.header}>My Cards</Text>
             {cards.length > 0 && (
@@ -602,7 +602,7 @@ export default function App() {
                             <View style={styles.benefitsRow}>
                               {benefits.slice(0, 3).map((b, i) => (
                                 <View key={i} style={styles.benefitChip}>
-                                  <FontAwesome6 name={b.icon} size={10} color="#6c6c70" iconStyle="solid" />
+                                  <FontAwesome6 name={b.icon} size={10} color="#6F4E37" iconStyle="solid" />
                                   <Text style={styles.benefitChipText}> {b.multiplier}</Text>
                                 </View>
                               ))}
@@ -673,7 +673,7 @@ export default function App() {
           return (
             <Pressable key={tab.key} style={ds.tabItem} onPress={() => handleTabPress(tab.key)}>
               <View style={[ds.tabIconWrap, active && ds.tabIconActive]}>
-                <FontAwesome6 name={tab.icon} size={20} color={active ? '#007aff' : '#aeaeb2'} iconStyle="solid" />
+                <FontAwesome6 name={tab.icon} size={20} color={active ? '#C08A5B' : '#CBB9A8'} iconStyle="solid" />
               </View>
               <Text style={[ds.tabLabel, active && ds.tabLabelActive]}>{tab.label}</Text>
             </Pressable>
@@ -867,7 +867,7 @@ export default function App() {
                               <View key={i} style={styles.benefitCol}>
                                 <Text style={styles.benefitColLabel}>{b.category}</Text>
                                 <View style={styles.benefitColPill}>
-                                  <FontAwesome6 name={b.icon} size={13} color="#007aff" iconStyle="solid" />
+                                  <FontAwesome6 name={b.icon} size={13} color="#C08A5B" iconStyle="solid" />
                                   <Text style={styles.benefitColPillText}>{b.multiplier}</Text>
                                 </View>
                               </View>

@@ -3,7 +3,7 @@ import { StyleSheet } from 'react-native';
 export const layoutStyles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f2f2f7',
+    backgroundColor: '#5a473e',
     paddingTop: 60,
     paddingHorizontal: 20,
   },
@@ -16,12 +16,12 @@ export const layoutStyles = StyleSheet.create({
   header: {
     fontSize: 34,
     fontWeight: '700',
-    color: '#1c1c1e',
+    color: '#F8F4EF',
     letterSpacing: -0.5,
   },
   selectButton: {
     fontSize: 16,
-    color: '#007aff',
+    color: '#C08A5B',
     fontWeight: '500',
   },
   scrollContent: {
@@ -45,12 +45,12 @@ export const layoutStyles = StyleSheet.create({
   emptyStateTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1c1c1e',
+    color: '#F8F4EF',
     marginBottom: 6,
   },
   emptyStateSub: {
     fontSize: 14,
-    color: '#aeaeb2',
+    color: '#CBB9A8',
   },
 
   deleteErrorText: {
@@ -68,7 +68,7 @@ export const layoutStyles = StyleSheet.create({
   selectedCount: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#aeaeb2',
+    color: '#CBB9A8',
     flexShrink: 1,
   },
   deleteSelectedButton: {
@@ -79,23 +79,23 @@ export const layoutStyles = StyleSheet.create({
     alignItems: 'center',
   },
   deleteSelectedButtonDisabled: {
-    backgroundColor: '#f2f2f7',
+    backgroundColor: '#3A2A24',
   },
   deleteSelectedButtonPressed: {
     opacity: 0.8,
     transform: [{ scale: 0.98 }],
   },
   deleteSelectedText: {
-    color: '#ffffff',
+    color: '#F8F4EF',
     fontSize: 16,
     fontWeight: '700',
   },
   deleteSelectedTextDisabled: {
-    color: '#aeaeb2',
+    color: '#CBB9A8',
   },
 
   addButton: {
-    backgroundColor: '#1c1c1e',
+    backgroundColor: '#6d4c2f',
     borderRadius: 16,
     paddingVertical: 16,
     alignItems: 'center',
@@ -106,7 +106,7 @@ export const layoutStyles = StyleSheet.create({
     transform: [{ scale: 0.98 }],
   },
   addButtonText: {
-    color: '#ffffff',
+    color: '#F8F4EF',
     fontSize: 16,
     fontWeight: '700',
     letterSpacing: 0.2,

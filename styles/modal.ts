@@ -4,10 +4,10 @@ export const modalStyles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
     justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.35)',
+    backgroundColor: 'rgba(0,0,0,0.5)',
   },
   modalSheet: {
-    backgroundColor: '#ffffff',
+    backgroundColor: '#3A2A24',
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     overflow: 'hidden',
@@ -15,7 +15,7 @@ export const modalStyles = StyleSheet.create({
   dragHandle: {
     width: 36,
     height: 4,
-    backgroundColor: '#e5e5ea',
+    backgroundColor: '#8C6E5A',
     borderRadius: 2,
     alignSelf: 'center',
     marginTop: 10,
@@ -32,26 +32,26 @@ export const modalStyles = StyleSheet.create({
   modalTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#1c1c1e',
+    color: '#F8F4EF',
     letterSpacing: -0.3,
   },
   closeButton: {
     fontSize: 16,
-    color: '#aeaeb2',
+    color: '#CBB9A8',
     padding: 4,
   },
   backButton: {
     fontSize: 16,
-    color: '#007aff',
+    color: '#C08A5B',
     fontWeight: '500',
   },
 
   searchInput: {
-    backgroundColor: '#f2f2f7',
+    backgroundColor: '#2B1D17',
     borderRadius: 14,
     paddingHorizontal: 14,
     paddingVertical: 11,
-    color: '#1c1c1e',
+    color: '#F8F4EF',
     fontSize: 15,
     marginHorizontal: 20,
     marginBottom: 12,
@@ -68,18 +68,18 @@ export const modalStyles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 7,
     borderRadius: 20,
-    backgroundColor: '#f2f2f7',
+    backgroundColor: '#2B1D17',
   },
   issuerPillActive: {
-    backgroundColor: '#1c1c1e',
+    backgroundColor: '#C08A5B',
   },
   issuerPillText: {
-    color: '#6c6c70',
+    color: '#CBB9A8',
     fontSize: 13,
     fontWeight: '500',
   },
   issuerPillTextActive: {
-    color: '#ffffff',
+    color: '#F8F4EF',
     fontWeight: '600',
   },
 
@@ -92,11 +92,11 @@ export const modalStyles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#f2f2f7',
+    borderBottomColor: 'rgba(140,110,90,0.3)',
     gap: 12,
   },
   catalogItemPressed: {
-    backgroundColor: '#f9f9fb',
+    backgroundColor: 'rgba(192,138,91,0.1)',
   },
   catalogImageWrap: {
     width: 86,
@@ -111,7 +111,7 @@ export const modalStyles = StyleSheet.create({
     height: '100%',
   },
   catalogCustomLabel: {
-    color: '#ffffff',
+    color: '#F8F4EF',
     fontSize: 12,
     fontWeight: '600',
   },
@@ -121,27 +121,27 @@ export const modalStyles = StyleSheet.create({
   catalogCardName: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#1c1c1e',
+    color: '#F8F4EF',
     marginBottom: 2,
   },
   catalogCardIssuer: {
     fontSize: 12,
-    color: '#aeaeb2',
+    color: '#CBB9A8',
   },
   catalogFeeBadge: {
-    backgroundColor: '#f2f2f7',
+    backgroundColor: '#2B1D17',
     borderRadius: 20,
     paddingHorizontal: 8,
     paddingVertical: 3,
   },
   catalogFeeBadgeText: {
     fontSize: 11,
-    color: '#6c6c70',
+    color: '#CBB9A8',
     fontWeight: '600',
   },
   chevron: {
     fontSize: 20,
-    color: '#c7c7cc',
+    color: '#8C6E5A',
   },
 
   detailsRow: {
@@ -172,29 +172,29 @@ export const modalStyles = StyleSheet.create({
   detailCardName: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#1c1c1e',
+    color: '#F8F4EF',
     textAlign: 'center',
     lineHeight: 18,
   },
   detailFeePill: {
-    backgroundColor: '#007aff',
+    backgroundColor: '#C08A5B',
     borderRadius: 20,
     paddingHorizontal: 16,
     paddingVertical: 8,
   },
   detailFeePillText: {
-    color: '#ffffff',
+    color: '#F8F4EF',
     fontSize: 15,
     fontWeight: '700',
   },
   detailNoFeePill: {
-    backgroundColor: '#e8f8ed',
+    backgroundColor: 'rgba(122,158,126,0.2)',
     borderRadius: 20,
     paddingHorizontal: 16,
     paddingVertical: 8,
   },
   detailNoFeePillText: {
-    color: '#34c759',
+    color: '#7A9E7E',
     fontSize: 15,
     fontWeight: '600',
   },
@@ -206,24 +206,24 @@ export const modalStyles = StyleSheet.create({
   inputLabel: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#aeaeb2',
+    color: '#CBB9A8',
     marginBottom: 5,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   input: {
-    backgroundColor: '#f2f2f7',
+    backgroundColor: '#2B1D17',
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    color: '#1c1c1e',
+    color: '#F8F4EF',
     fontSize: 15,
     marginBottom: 16,
   },
   benefitsGridLabel: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#aeaeb2',
+    color: '#CBB9A8',
     marginBottom: 8,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
@@ -242,7 +242,7 @@ export const modalStyles = StyleSheet.create({
   benefitColLabel: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#aeaeb2',
+    color: '#CBB9A8',
     textTransform: 'uppercase',
     letterSpacing: 0.4,
     textAlign: 'center',
@@ -250,7 +250,7 @@ export const modalStyles = StyleSheet.create({
   benefitColPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f0f6ff',
+    backgroundColor: 'rgba(192,138,91,0.15)',
     borderRadius: 20,
     paddingHorizontal: 11,
     paddingVertical: 6,
@@ -258,7 +258,7 @@ export const modalStyles = StyleSheet.create({
   },
   benefitColPillText: {
     fontSize: 14,
-    color: '#007aff',
+    color: '#C08A5B',
     fontWeight: '700',
   },
 
@@ -277,20 +277,20 @@ export const modalStyles = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: 32,
     borderTopWidth: 1,
-    borderTopColor: '#f2f2f7',
+    borderTopColor: '#8C6E5A',
   },
   cancelButton: {
     flex: 1,
     paddingVertical: 15,
     borderRadius: 16,
     alignItems: 'center',
-    backgroundColor: '#f2f2f7',
+    backgroundColor: '#2B1D17',
   },
   cancelButtonPressed: {
     opacity: 0.7,
   },
   cancelButtonText: {
-    color: '#6c6c70',
+    color: '#CBB9A8',
     fontSize: 15,
     fontWeight: '600',
   },
@@ -299,14 +299,14 @@ export const modalStyles = StyleSheet.create({
     paddingVertical: 15,
     borderRadius: 16,
     alignItems: 'center',
-    backgroundColor: '#1c1c1e',
+    backgroundColor: '#C08A5B',
   },
   saveButtonPressed: {
     opacity: 0.8,
     transform: [{ scale: 0.98 }],
   },
   saveButtonText: {
-    color: '#ffffff',
+    color: '#F8F4EF',
     fontSize: 15,
     fontWeight: '700',
   },

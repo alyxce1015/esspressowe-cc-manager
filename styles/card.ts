@@ -2,18 +2,18 @@ import { StyleSheet } from 'react-native';
 
 export const cardStyles = StyleSheet.create({
   card: {
-    backgroundColor: '#ffffff',
+    backgroundColor: '#F4EDE4',
     borderRadius: 20,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#e5e5ea',
+    borderColor: '#CBB9A8',
     flexDirection: 'row',
     alignItems: 'flex-start',
     padding: 16,
     gap: 14,
-    shadowColor: '#000',
+    shadowColor: '#2B1D17',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
+    shadowOpacity: 0.2,
     shadowRadius: 8,
     elevation: 2,
   },
@@ -28,30 +28,29 @@ export const cardStyles = StyleSheet.create({
     transform: [{ scale: 0.985 }],
   },
   cardSelected: {
-    borderColor: '#007aff',
-    backgroundColor: '#f0f6ff',
+    borderColor: '#C08A5B',
+    backgroundColor: 'rgba(192,138,91,0.08)',
   },
   checkbox: {
     width: 22,
     height: 22,
     borderRadius: 11,
     borderWidth: 2,
-    borderColor: '#c7c7cc',
+    borderColor: '#8C6E5A',
     justifyContent: 'center',
     alignItems: 'center',
     alignSelf: 'center',
     flexShrink: 0,
   },
   checkboxSelected: {
-    backgroundColor: '#007aff',
-    borderColor: '#007aff',
+    backgroundColor: '#C08A5B',
+    borderColor: '#C08A5B',
   },
   trashButton: {
     alignSelf: 'flex-start',
     paddingTop: 2,
     paddingLeft: 4,
   },
-
 
   cardImageColumn: {
     alignItems: 'center',
@@ -69,13 +68,13 @@ export const cardStyles = StyleSheet.create({
   },
   cardDateOpenedLabel: {
     fontSize: 9,
-    color: '#aeaeb2',
+    color: '#8C6E5A',
     fontWeight: '500',
     textAlign: 'center',
   },
   cardAgeLabel: {
     fontSize: 9,
-    color: '#c7c7cc',
+    color: '#CBB9A8',
     textAlign: 'center',
   },
   cardImage: {
@@ -83,7 +82,7 @@ export const cardStyles = StyleSheet.create({
     height: '100%',
   },
   customCardLabel: {
-    color: '#ffffff',
+    color: '#F8F4EF',
     fontSize: 11,
     fontWeight: '700',
     textAlign: 'center',
@@ -104,7 +103,7 @@ export const cardStyles = StyleSheet.create({
     flex: 1,
     fontSize: 15,
     fontWeight: '600',
-    color: '#1c1c1e',
+    color: '#2A211C',
   },
   cardBadgeRow: {
     flexDirection: 'row',
@@ -115,19 +114,19 @@ export const cardStyles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    backgroundColor: '#007aff',
+    backgroundColor: '#6d4c2f',
     borderRadius: 20,
     paddingHorizontal: 10,
     paddingVertical: 4,
     flexShrink: 0,
   },
   feeBadgeUrgent: {
-    backgroundColor: '#fff0f0',
+    backgroundColor: 'rgba(139,58,58,0.12)',
     borderWidth: 1,
     borderColor: '#ff3b30',
   },
   feeBadgeText: {
-    color: '#ffffff',
+    color: '#F8F4EF',
     fontSize: 12,
     fontWeight: '700',
   },
@@ -136,19 +135,19 @@ export const cardStyles = StyleSheet.create({
   },
   cardLast4: {
     fontSize: 12,
-    color: '#aeaeb2',
+    color: '#8C6E5A',
   },
 
   noFeePill: {
     alignSelf: 'flex-start',
-    backgroundColor: '#e8f8ed',
+    backgroundColor: 'rgba(122,158,126,0.15)',
     borderRadius: 20,
     paddingHorizontal: 10,
     paddingVertical: 4,
     marginTop: 2,
   },
   noFeePillText: {
-    color: '#34c759',
+    color: '#7A9E7E',
     fontSize: 12,
     fontWeight: '600',
   },
@@ -164,12 +163,12 @@ export const cardStyles = StyleSheet.create({
   },
   renewalLabel: {
     fontSize: 11,
-    color: '#aeaeb2',
+    color: '#8C6E5A',
   },
   daysText: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#1c1c1e',
+    color: '#2A211C',
   },
   progressRow: {
     flexDirection: 'row',
@@ -178,13 +177,13 @@ export const cardStyles = StyleSheet.create({
   },
   progressTrack: {
     height: 4,
-    backgroundColor: '#e5e5ea',
+    backgroundColor: '#D4BBA8',
     borderRadius: 2,
     overflow: 'hidden',
   },
   progressFill: {
     height: 4,
-    backgroundColor: '#007aff',
+    backgroundColor: '#C08A5B',
     borderRadius: 2,
   },
   progressFillUrgent: {
@@ -196,22 +195,22 @@ export const cardStyles = StyleSheet.create({
   progressFeeLabel: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#1c1c1e',
+    color: '#2A211C',
     flexShrink: 0,
   },
   renewalDateText: {
     fontSize: 11,
-    color: '#aeaeb2',
+    color: '#8C6E5A',
   },
   setDateHint: {
     fontSize: 11,
-    color: '#c7c7cc',
+    color: '#CBB9A8',
     marginTop: 2,
     fontStyle: 'italic',
   },
   cardOpenedText: {
     fontSize: 11,
-    color: '#aeaeb2',
+    color: '#8C6E5A',
     marginTop: 2,
   },
 
@@ -222,14 +221,14 @@ export const cardStyles = StyleSheet.create({
     marginTop: 6,
   },
   benefitChip: {
-    backgroundColor: '#f2f2f7',
+    backgroundColor: '#EDE1D4',
     borderRadius: 20,
     paddingHorizontal: 9,
     paddingVertical: 3,
   },
   benefitChipText: {
     fontSize: 12,
-    color: '#6c6c70',
+    color: '#6F4E37',
     fontWeight: '500',
   },
 });
