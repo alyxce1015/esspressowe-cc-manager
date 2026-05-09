@@ -352,7 +352,7 @@ export default function App() {
               {/* Trash button — sibling to content, not nested inside it */}
               {!selectMode && (
                 <TouchableOpacity style={styles.trashButton} onPress={() => handleDeleteOne(card.id)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                  <FontAwesome6 name="trash" size={14} color="#c7c7cc" iconStyle="solid" />
+                  <FontAwesome6 name="trash" size={14} color="#ff32277a" iconStyle="solid" />
                 </TouchableOpacity>
               )}
               </View>
