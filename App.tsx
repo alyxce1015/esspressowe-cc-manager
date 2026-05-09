@@ -528,7 +528,16 @@ export default function App() {
         <ScrollView style={ds.homeScroll} contentContainerStyle={ds.homeScrollContent} showsVerticalScrollIndicator={false}>
 
           {/* App title */}
-          <Text style={ds.appTitle}>Esspressowe</Text>
+          <View style={{ alignItems: 'center', gap: 8 }}>
+            <Text style={ds.appTitle}>Esspressowe</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, width: '55%' }}>
+              <View style={{ flex: 1, height: 1, backgroundColor: 'rgba(192,138,91,0.45)' }} />
+              <FontAwesome6 name="mug-hot" size={10} color="#C08A5B" iconStyle="solid" />
+              <FontAwesome6 name="mug-hot" size={10} color="#C08A5B" iconStyle="solid" />
+              <FontAwesome6 name="mug-hot" size={10} color="#C08A5B" iconStyle="solid" />
+              <View style={{ flex: 1, height: 1, backgroundColor: 'rgba(192,138,91,0.45)' }} />
+            </View>
+          </View>
 
           {/* Hero card */}
           <View style={ds.heroCard}>
