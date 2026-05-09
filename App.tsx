@@ -91,7 +91,8 @@ function formatRenewalDate(memberSince: string): string {
 
 export default function App() {
   const [fontsLoaded] = useFonts(FontAwesome6.font);
-  const { height: windowHeight } = useWindowDimensions();
+  const { height: windowHeight, width: windowWidth } = useWindowDimensions();
+  const isDesktop = windowWidth >= 768;
   const [cards, setCards] = useState<UserCard[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [step, setStep] = useState<'pick' | 'details'>('pick');
@@ -254,7 +255,8 @@ export default function App() {
           </View>
         )}
 
-        {cards.map((card) => {
+        <View style={[styles.cardGrid, isDesktop && styles.cardGridDesktop]}>
+          {cards.map((card) => {
           const catalogEntry = CARD_CATALOG.find((c) => c.id === card.catalogId);
           const imageSource = catalogEntry?.image ?? null;
           const annualFee = catalogEntry?.annualFee ?? 0;
@@ -263,7 +265,8 @@ export default function App() {
           const isSelected = selectedIds.has(card.id);
 
           return (
-            <View key={card.id} style={[styles.card, isSelected && styles.cardSelected]}>
+            <View key={card.id} style={isDesktop ? styles.cardGridItem : undefined}>
+              <View style={[styles.card, isSelected && styles.cardSelected]}>
               {/* Card content — Pressable only active in select mode */}
               <Pressable
                 style={({ pressed }) => [
@@ -352,9 +355,11 @@ export default function App() {
                   <FontAwesome6 name="trash" size={14} color="#c7c7cc" iconStyle="solid" />
                 </TouchableOpacity>
               )}
+              </View>
             </View>
           );
         })}
+        </View>
       </ScrollView>
 
       {selectMode ? (
@@ -559,7 +564,7 @@ export default function App() {
                               <View key={i} style={styles.benefitCol}>
                                 <Text style={styles.benefitColLabel}>{b.category}</Text>
                                 <View style={styles.benefitColPill}>
-                                  <FontAwesome6 name={b.icon} size={11} color="#007aff" iconStyle="solid" />
+                                  <FontAwesome6 name={b.icon} size={13} color="#007aff" iconStyle="solid" />
                                   <Text style={styles.benefitColPillText}>{b.multiplier}</Text>
                                 </View>
                               </View>

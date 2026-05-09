@@ -27,6 +27,16 @@ export const layoutStyles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 20,
   },
+  cardGrid: {},
+  cardGridDesktop: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginHorizontal: -6,
+  },
+  cardGridItem: {
+    width: '50%',
+    paddingHorizontal: 6,
+  },
 
   emptyState: {
     alignItems: 'center',
