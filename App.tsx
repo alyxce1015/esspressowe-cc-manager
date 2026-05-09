@@ -175,6 +175,14 @@ function parseDateInput(input: string): string | undefined {
   return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 }
 
+function abbreviateCardName(name: string): string {
+  return name
+    .replace(/Bank of America/gi, 'BofA')
+    .replace(/American Express/gi, 'AMEX')
+    .replace(/Wells Fargo/gi, 'WF')
+    .replace(/Capital One/gi, 'Cap1');
+}
+
 function todayMMDDYYYY(): string {
   const d = new Date();
   return `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}/${d.getFullYear()}`;
@@ -651,8 +659,8 @@ export default function App() {
                         </View>
 
                         <View style={styles.cardInfo}>
-                          <View style={styles.cardNameRow}>
-                            <Text style={styles.cardName} numberOfLines={1}>{card.name}</Text>
+                          <View style={[styles.cardNameRow, isDesktop && styles.cardNameRowDesktop]}>
+                            <Text style={[styles.cardName, isDesktop && styles.cardNameDesktop]} numberOfLines={isDesktop ? 1 : 2}>{isDesktop ? card.name : abbreviateCardName(card.name)}</Text>
                             <View style={styles.cardBadgeRow}>
                               {(() => {
                                 const urgent = daysUntilDue(card.dueDay) <= 10;

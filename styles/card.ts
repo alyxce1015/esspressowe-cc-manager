@@ -94,16 +94,23 @@ export const cardStyles = StyleSheet.create({
     gap: 4,
   },
   cardNameRow: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: 5,
+  },
+  cardNameRowDesktop: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 8,
   },
   cardName: {
-    flex: 1,
     fontSize: 15,
     fontWeight: '600',
     color: '#2A211C',
+  },
+  cardNameDesktop: {
+    flex: 1,
   },
   cardBadgeRow: {
     flexDirection: 'row',
