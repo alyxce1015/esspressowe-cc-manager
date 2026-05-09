@@ -1,4 +1,4 @@
-# Credit Card Manager
+# Esspresowe
 
 A React Native (Expo) app for tracking your credit cards, monitoring available credit, logging purchases, and keeping an eye on upcoming payments and annual fee renewals.
 
