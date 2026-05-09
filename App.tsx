@@ -1,23 +1,20 @@
 import { useState, useEffect, useRef } from 'react';
+import { useFonts } from 'expo-font';
 import { StatusBar } from 'expo-status-bar';
 import {
   StyleSheet, Text, View, ScrollView, Pressable,
   Modal, TextInput, KeyboardAvoidingView, Platform, Image,
   useWindowDimensions, Animated,
 } from 'react-native';
+import { FontAwesome6 } from '@expo/vector-icons';
 import { CARD_CATALOG, ISSUERS, type CatalogCard } from './data/cards';
 import { getCards, insertCard, type UserCard } from './db/database';
 
-function ordinal(n: number): string {
-  const s = ['th', 'st', 'nd', 'rd'];
-  const v = n % 100;
-  return n + (s[(v - 20) % 10] || s[v] || s[0]);
-}
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
 
 function generateUUID(): string {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    return crypto.randomUUID();
-  }
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
     const r = (Math.random() * 16) | 0;
     return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
@@ -30,7 +27,53 @@ function formatCurrency(input: string): string {
   return '$' + parseInt(digits, 10).toLocaleString('en-US');
 }
 
+// Parses "MM/YYYY" → "YYYY-MM-01", returns undefined if invalid
+function parseMemberSince(input: string): string | undefined {
+  const match = input.trim().match(/^(\d{1,2})\/(\d{4})$/);
+  if (!match) return undefined;
+  const month = parseInt(match[1], 10);
+  const year = parseInt(match[2], 10);
+  if (month < 1 || month > 12) return undefined;
+  if (year < 1990 || year > new Date().getFullYear() + 1) return undefined;
+  return `${year}-${String(month).padStart(2, '0')}-01`;
+}
+
+function nextRenewalDate(memberSince: string): Date {
+  const since = new Date(memberSince + 'T00:00:00');
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  let renewal = new Date(today.getFullYear(), since.getMonth(), since.getDate());
+  if (renewal <= today) renewal = new Date(today.getFullYear() + 1, since.getMonth(), since.getDate());
+  return renewal;
+}
+
+function daysUntilRenewal(memberSince: string): number {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return Math.ceil((nextRenewalDate(memberSince).getTime() - today.getTime()) / 86400000);
+}
+
+function renewalProgress(memberSince: string): number {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const renewal = nextRenewalDate(memberSince);
+  const prev = new Date(renewal);
+  prev.setFullYear(prev.getFullYear() - 1);
+  const total = renewal.getTime() - prev.getTime();
+  const elapsed = today.getTime() - prev.getTime();
+  return Math.max(0, Math.min(1, elapsed / total));
+}
+
+function formatRenewalDate(memberSince: string): string {
+  return nextRenewalDate(memberSince).toLocaleDateString('en-US', {
+    month: 'short', day: 'numeric', year: 'numeric',
+  });
+}
+
+// ─── Component ───────────────────────────────────────────────────────────────
+
 export default function App() {
+  const [fontsLoaded] = useFonts(FontAwesome6.font);
   const { height: windowHeight } = useWindowDimensions();
   const [cards, setCards] = useState<UserCard[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
@@ -38,31 +81,25 @@ export default function App() {
   const [selectedCard, setSelectedCard] = useState<CatalogCard | null>(null);
   const [search, setSearch] = useState('');
   const [issuerFilter, setIssuerFilter] = useState('All');
-  const [form, setForm] = useState({ customName: '', lastFour: '', dueDay: '', limit: '' });
+  const [form, setForm] = useState({ customName: '', lastFour: '', dueDay: '', limit: '', memberSince: '' });
   const [saveError, setSaveError] = useState('');
 
   const stepAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    console.log('Loading cards from Supabase...');
     getCards()
-      .then((loaded) => {
-        console.log('Cards loaded:', loaded.length);
-        setCards(loaded);
-      })
-      .catch((e) => {
-        const msg = e instanceof Error ? e.message : String(e);
-        console.error('Failed to load cards:', msg);
-        setSaveError('Could not load cards: ' + msg);
-      });
+      .then(setCards)
+      .catch((e) => setSaveError('Could not load cards: ' + (e instanceof Error ? e.message : String(e))));
   }, []);
+
+  if (!fontsLoaded) return null;
 
   function openModal() {
     setStep('pick');
     setSelectedCard(null);
     setSearch('');
     setIssuerFilter('All');
-    setForm({ customName: '', lastFour: '', dueDay: '', limit: '' });
+    setForm({ customName: '', lastFour: '', dueDay: '', limit: '', memberSince: '' });
     setSaveError('');
     stepAnim.setValue(1);
     setModalVisible(true);
@@ -76,10 +113,7 @@ export default function App() {
   }
 
   function pickCard(card: CatalogCard) {
-    animateStep(() => {
-      setSelectedCard(card);
-      setStep('details');
-    });
+    animateStep(() => { setSelectedCard(card); setStep('details'); });
   }
 
   function goBack() {
@@ -88,12 +122,7 @@ export default function App() {
 
   async function saveCard() {
     setSaveError('');
-    console.log('saveCard called', { selectedCard: selectedCard?.id, form });
-
-    if (!selectedCard) {
-      setSaveError('No card selected.');
-      return;
-    }
+    if (!selectedCard) { setSaveError('No card selected.'); return; }
 
     const dueDay = parseInt(form.dueDay, 10);
     if (isNaN(dueDay) || dueDay < 1 || dueDay > 31) {
@@ -102,39 +131,36 @@ export default function App() {
     }
 
     const name = selectedCard.id === 'custom' ? form.customName.trim() : selectedCard.name;
-    if (!name) {
-      setSaveError('Card name is required.');
+    if (!name) { setSaveError('Card name is required.'); return; }
+
+    const memberSince = form.memberSince.trim() ? parseMemberSince(form.memberSince) : undefined;
+    if (form.memberSince.trim() && !memberSince) {
+      setSaveError('Enter card open date as MM/YYYY (e.g. 04/2023).');
       return;
     }
 
-    const newCard = {
-      id: generateUUID(),
-      catalogId: selectedCard.id,
-      name,
-      lastFour: form.lastFour.trim(),
-      dueDay,
-      limit: form.limit.trim(),
-      imageUrl: '',
-      color: selectedCard.color,
-    };
-
-    console.log('Inserting card:', newCard);
-
     try {
-      await insertCard(newCard);
-      console.log('Insert succeeded, refreshing list...');
+      await insertCard({
+        id: generateUUID(),
+        catalogId: selectedCard.id,
+        name,
+        lastFour: form.lastFour.trim(),
+        dueDay,
+        limit: form.limit.trim(),
+        imageUrl: '',
+        color: selectedCard.color,
+        memberSince,
+      });
       setCards(await getCards());
       setModalVisible(false);
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      console.error('Insert failed:', msg);
-      setSaveError(msg);
+      setSaveError(e instanceof Error ? e.message : String(e));
     }
   }
 
-  const filteredCatalog = CARD_CATALOG.filter((card) => {
-    const matchesSearch = card.name.toLowerCase().includes(search.toLowerCase());
-    const matchesIssuer = issuerFilter === 'All' || card.issuer === issuerFilter;
+  const filteredCatalog = CARD_CATALOG.filter((c) => {
+    const matchesSearch = c.name.toLowerCase().includes(search.toLowerCase());
+    const matchesIssuer = issuerFilter === 'All' || c.issuer === issuerFilter;
     return matchesSearch && matchesIssuer;
   });
 
@@ -150,34 +176,82 @@ export default function App() {
             <Text style={styles.emptyStateSub}>Tap + Add Card to get started</Text>
           </View>
         )}
+
         {cards.map((card) => {
           const catalogEntry = CARD_CATALOG.find((c) => c.id === card.catalogId);
           const imageSource = catalogEntry?.image ?? null;
+          const annualFee = catalogEntry?.annualFee ?? 0;
+          const benefits = catalogEntry?.benefits ?? [];
+
           return (
             <Pressable
               key={card.id}
               style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
             >
+              {/* Card image */}
               <View style={[styles.cardImageWrap, { backgroundColor: card.color }]}>
-                {imageSource ? (
-                  <Image source={imageSource} style={styles.cardImage} resizeMode="cover" />
-                ) : (
-                  <Text style={styles.customCardLabel}>{card.name}</Text>
-                )}
+                {imageSource
+                  ? <Image source={imageSource} style={styles.cardImage} resizeMode="cover" />
+                  : <Text style={styles.customCardLabel}>{card.name}</Text>
+                }
               </View>
-              <View style={styles.cardBodyLeft}>
-                <Text style={styles.cardName}>{card.name}</Text>
+
+              {/* Card info */}
+              <View style={styles.cardInfo}>
+
+                {/* Name + annual fee badge */}
+                <View style={styles.cardNameRow}>
+                  <Text style={styles.cardName} numberOfLines={1}>{card.name}</Text>
+                  <View style={styles.feeBadge}>
+                    <Text style={styles.feeBadgeText}>
+                      {annualFee === 0 ? '$0' : `$${annualFee}`}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Last 4 */}
                 <Text style={styles.cardLast4}>•••• {card.lastFour}</Text>
-              </View>
-              <View style={styles.cardBodyRight}>
-                <View>
-                  <Text style={styles.label}>Due</Text>
-                  <Text style={styles.value}>{ordinal(card.dueDay)}</Text>
-                </View>
-                <View>
-                  <Text style={styles.label}>Limit</Text>
-                  <Text style={styles.value}>{card.limit || '—'}</Text>
-                </View>
+
+                {/* Annual fee section */}
+                {annualFee === 0 ? (
+                  <View style={styles.noFeePill}>
+                    <Text style={styles.noFeePillText}>No annual fee</Text>
+                  </View>
+                ) : card.memberSince ? (
+                  <View style={styles.renewalSection}>
+                    <View style={styles.renewalRow}>
+                      <Text style={styles.renewalLabel}>Next annual fee</Text>
+                      <Text style={styles.daysText}>
+                        {daysUntilRenewal(card.memberSince)} days remaining
+                      </Text>
+                    </View>
+                    <View style={styles.progressTrack}>
+                      <View
+                        style={[
+                          styles.progressFill,
+                          { width: `${Math.round(renewalProgress(card.memberSince) * 100)}%` },
+                        ]}
+                      />
+                    </View>
+                    <Text style={styles.renewalDateText}>
+                      {formatRenewalDate(card.memberSince)}
+                    </Text>
+                  </View>
+                ) : (
+                  <Text style={styles.setDateHint}>Add open date to track renewal</Text>
+                )}
+
+                {/* Benefit chips */}
+                {benefits.length > 0 && (
+                  <View style={styles.benefitsRow}>
+                    {benefits.slice(0, 3).map((b, i) => (
+                      <View key={i} style={styles.benefitChip}>
+                        <FontAwesome6 name={b.icon} size={10} color="#6c6c70" iconStyle="regular" />
+                        <Text style={styles.benefitChipText}> {b.multiplier}</Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
               </View>
             </Pressable>
           );
@@ -191,11 +265,10 @@ export default function App() {
         <Text style={styles.addButtonText}>+ Add Card</Text>
       </Pressable>
 
+      {/* ── Add Card Modal ── */}
       <Modal visible={modalVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalSheet, { height: windowHeight * 0.92 }]}>
-
-            {/* drag handle */}
             <View style={styles.dragHandle} />
 
             <Animated.View style={{ flex: 1, opacity: stepAnim }}>
@@ -238,16 +311,20 @@ export default function App() {
                         onPress={() => pickCard(card)}
                       >
                         <View style={[styles.catalogImageWrap, { backgroundColor: card.color }]}>
-                          {card.image ? (
-                            <Image source={card.image} style={styles.catalogImage} resizeMode="cover" />
-                          ) : (
-                            <Text style={styles.catalogCustomLabel}>Custom</Text>
-                          )}
+                          {card.image
+                            ? <Image source={card.image} style={styles.catalogImage} resizeMode="cover" />
+                            : <Text style={styles.catalogCustomLabel}>Custom</Text>
+                          }
                         </View>
                         <View style={styles.catalogItemInfo}>
                           <Text style={styles.catalogCardName}>{card.name}</Text>
                           <Text style={styles.catalogCardIssuer}>{card.issuer}</Text>
                         </View>
+                        {card.annualFee > 0 && (
+                          <View style={styles.catalogFeeBadge}>
+                            <Text style={styles.catalogFeeBadgeText}>${card.annualFee}/yr</Text>
+                          </View>
+                        )}
                         <Text style={styles.chevron}>›</Text>
                       </Pressable>
                     ))}
@@ -267,28 +344,33 @@ export default function App() {
                     </Pressable>
                   </View>
 
-                  {/* Two-column body */}
                   <View style={styles.detailsRow}>
-
-                    {/* Left: card thumbnail + name */}
+                    {/* Left: card thumb + name */}
                     <View style={styles.detailsLeft}>
                       <View style={[styles.detailThumb, { backgroundColor: selectedCard?.color }]}>
-                        {selectedCard?.image ? (
-                          <Image source={selectedCard.image} style={styles.detailThumbImage} resizeMode="cover" />
-                        ) : (
-                          <Text style={styles.customCardLabel}>
-                            {form.customName || 'Custom'}
-                          </Text>
-                        )}
+                        {selectedCard?.image
+                          ? <Image source={selectedCard.image} style={styles.detailThumbImage} resizeMode="cover" />
+                          : <Text style={styles.customCardLabel}>{form.customName || 'Custom'}</Text>
+                        }
                       </View>
                       <Text style={styles.detailCardName} numberOfLines={3}>
                         {selectedCard?.id === 'custom'
                           ? (form.customName || 'Custom Card')
                           : selectedCard?.name}
                       </Text>
+                      {selectedCard && selectedCard.annualFee > 0 && (
+                        <View style={styles.detailFeePill}>
+                          <Text style={styles.detailFeePillText}>${selectedCard.annualFee}/yr</Text>
+                        </View>
+                      )}
+                      {selectedCard && selectedCard.annualFee === 0 && (
+                        <View style={styles.detailNoFeePill}>
+                          <Text style={styles.detailNoFeePillText}>No annual fee</Text>
+                        </View>
+                      )}
                     </View>
 
-                    {/* Right: input fields */}
+                    {/* Right: inputs */}
                     <ScrollView
                       style={styles.detailsRight}
                       showsVerticalScrollIndicator={false}
@@ -338,15 +420,24 @@ export default function App() {
                         value={form.limit}
                         onChangeText={(v) => setForm((f) => ({ ...f, limit: formatCurrency(v) }))}
                       />
+
+                      <Text style={styles.inputLabel}>Card Opened (MM/YYYY)</Text>
+                      <TextInput
+                        style={styles.input}
+                        placeholder="04/2023"
+                        placeholderTextColor="#aeaeb2"
+                        keyboardType="numeric"
+                        maxLength={7}
+                        value={form.memberSince}
+                        onChangeText={(v) => setForm((f) => ({ ...f, memberSince: v }))}
+                      />
                     </ScrollView>
                   </View>
 
-                  {/* Inline error */}
                   {saveError !== '' && (
                     <Text style={styles.saveErrorText}>{saveError}</Text>
                   )}
 
-                  {/* Buttons — full width below both columns */}
                   <View style={styles.modalButtons}>
                     <Pressable
                       style={({ pressed }) => [styles.cancelButton, pressed && styles.cancelButtonPressed]}
@@ -371,6 +462,8 @@ export default function App() {
   );
 }
 
+// ─── Styles ──────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -389,22 +482,22 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
 
-  // Home screen cards
+  // ── Card row ──
   card: {
     backgroundColor: '#ffffff',
-    borderRadius: 16,
-    marginBottom: 10,
+    borderRadius: 20,
+    marginBottom: 12,
     borderWidth: 1,
     borderColor: '#e5e5ea',
     flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    gap: 12,
+    alignItems: 'flex-start',
+    padding: 16,
+    gap: 14,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 1,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
   },
   cardPressed: {
     opacity: 0.75,
@@ -413,11 +506,12 @@ const styles = StyleSheet.create({
   cardImageWrap: {
     width: 90,
     height: 57,
-    borderRadius: 8,
+    borderRadius: 10,
     overflow: 'hidden',
     justifyContent: 'center',
     alignItems: 'center',
     flexShrink: 0,
+    marginTop: 2,
   },
   cardImage: {
     width: '100%',
@@ -428,39 +522,119 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     textAlign: 'center',
+    paddingHorizontal: 4,
   },
-  cardBodyLeft: {
+
+  // ── Card info (right side) ──
+  cardInfo: {
     flex: 1,
+    gap: 4,
   },
-  cardBodyRight: {
+  cardNameRow: {
     flexDirection: 'row',
-    gap: 16,
-    flexShrink: 0,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
   },
   cardName: {
+    flex: 1,
     fontSize: 15,
     fontWeight: '600',
     color: '#1c1c1e',
-    marginBottom: 2,
+  },
+  feeBadge: {
+    backgroundColor: '#007aff',
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    flexShrink: 0,
+  },
+  feeBadgeText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '700',
   },
   cardLast4: {
-    fontSize: 13,
-    color: '#6c6c70',
-  },
-  label: {
-    fontSize: 11,
+    fontSize: 12,
     color: '#aeaeb2',
-    marginBottom: 2,
-    textAlign: 'right',
-  },
-  value: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#1c1c1e',
-    textAlign: 'right',
   },
 
-  // Empty state
+  // ── No annual fee pill ──
+  noFeePill: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#e8f8ed',
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    marginTop: 2,
+  },
+  noFeePillText: {
+    color: '#34c759',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+
+  // ── Renewal section ──
+  renewalSection: {
+    marginTop: 4,
+    gap: 4,
+  },
+  renewalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  renewalLabel: {
+    fontSize: 11,
+    color: '#aeaeb2',
+  },
+  daysText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#1c1c1e',
+  },
+  progressTrack: {
+    height: 4,
+    backgroundColor: '#e5e5ea',
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: 4,
+    backgroundColor: '#007aff',
+    borderRadius: 2,
+  },
+  renewalDateText: {
+    fontSize: 11,
+    color: '#aeaeb2',
+  },
+  setDateHint: {
+    fontSize: 11,
+    color: '#c7c7cc',
+    marginTop: 2,
+    fontStyle: 'italic',
+  },
+
+  // ── Benefit chips ──
+  benefitsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 5,
+    marginTop: 6,
+  },
+  benefitChip: {
+    backgroundColor: '#f2f2f7',
+    borderRadius: 20,
+    paddingHorizontal: 9,
+    paddingVertical: 3,
+  },
+  benefitChipText: {
+    fontSize: 12,
+    color: '#6c6c70',
+    fontWeight: '500',
+  },
+
+  // ── Empty state ──
   emptyState: {
     alignItems: 'center',
     marginTop: 80,
@@ -476,10 +650,10 @@ const styles = StyleSheet.create({
     color: '#aeaeb2',
   },
 
-  // Add button
+  // ── Add button ──
   addButton: {
     backgroundColor: '#1c1c1e',
-    borderRadius: 14,
+    borderRadius: 16,
     paddingVertical: 16,
     alignItems: 'center',
     marginBottom: 32,
@@ -495,7 +669,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
 
-  // Modal
+  // ── Modal ──
   modalOverlay: {
     flex: 1,
     justifyContent: 'flex-end',
@@ -503,8 +677,8 @@ const styles = StyleSheet.create({
   },
   modalSheet: {
     backgroundColor: '#ffffff',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
     overflow: 'hidden',
   },
   dragHandle: {
@@ -541,10 +715,10 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
 
-  // Search
+  // ── Search ──
   searchInput: {
     backgroundColor: '#f2f2f7',
-    borderRadius: 12,
+    borderRadius: 14,
     paddingHorizontal: 14,
     paddingVertical: 11,
     color: '#1c1c1e',
@@ -553,7 +727,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
 
-  // Issuer filter
+  // ── Issuer filter ──
   issuerFilterRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -580,7 +754,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
-  // Catalog list
+  // ── Catalog list ──
   catalogList: {
     flex: 1,
   },
@@ -591,6 +765,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#f2f2f7',
+    gap: 12,
   },
   catalogItemPressed: {
     backgroundColor: '#f9f9fb',
@@ -614,7 +789,6 @@ const styles = StyleSheet.create({
   },
   catalogItemInfo: {
     flex: 1,
-    paddingHorizontal: 12,
   },
   catalogCardName: {
     fontSize: 14,
@@ -626,12 +800,23 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#aeaeb2',
   },
+  catalogFeeBadge: {
+    backgroundColor: '#f2f2f7',
+    borderRadius: 20,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  catalogFeeBadgeText: {
+    fontSize: 11,
+    color: '#6c6c70',
+    fontWeight: '600',
+  },
   chevron: {
     fontSize: 20,
     color: '#c7c7cc',
   },
 
-  // Details step — two-column layout
+  // ── Details step ──
   detailsRow: {
     flex: 1,
     flexDirection: 'row',
@@ -643,6 +828,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'flex-start',
     paddingTop: 8,
+    gap: 8,
   },
   detailThumb: {
     width: '90%',
@@ -651,7 +837,6 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 12,
   },
   detailThumbImage: {
     width: '100%',
@@ -663,6 +848,28 @@ const styles = StyleSheet.create({
     color: '#1c1c1e',
     textAlign: 'center',
     lineHeight: 18,
+  },
+  detailFeePill: {
+    backgroundColor: '#007aff',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+  },
+  detailFeePillText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  detailNoFeePill: {
+    backgroundColor: '#e8f8ed',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+  },
+  detailNoFeePillText: {
+    color: '#34c759',
+    fontSize: 13,
+    fontWeight: '600',
   },
   detailsRight: {
     flex: 1,
@@ -678,7 +885,7 @@ const styles = StyleSheet.create({
   },
   input: {
     backgroundColor: '#f2f2f7',
-    borderRadius: 10,
+    borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 10,
     color: '#1c1c1e',
@@ -704,7 +911,7 @@ const styles = StyleSheet.create({
   cancelButton: {
     flex: 1,
     paddingVertical: 15,
-    borderRadius: 14,
+    borderRadius: 16,
     alignItems: 'center',
     backgroundColor: '#f2f2f7',
   },
@@ -719,7 +926,7 @@ const styles = StyleSheet.create({
   saveButton: {
     flex: 2,
     paddingVertical: 15,
-    borderRadius: 14,
+    borderRadius: 16,
     alignItems: 'center',
     backgroundColor: '#1c1c1e',
   },

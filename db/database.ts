@@ -9,6 +9,7 @@ export type UserCard = {
   limit: string;
   imageUrl: string;
   color: string;
+  memberSince?: string; // ISO "YYYY-MM-DD", optional — add member_since column in Supabase to enable renewal tracking
 };
 
 function toRow(card: UserCard) {
@@ -21,6 +22,7 @@ function toRow(card: UserCard) {
     card_limit: card.limit,
     image_url: card.imageUrl,
     color: card.color,
+    ...(card.memberSince !== undefined && { member_since: card.memberSince }),
   };
 }
 
@@ -34,6 +36,7 @@ function fromRow(row: Record<string, unknown>): UserCard {
     limit: row.card_limit as string,
     imageUrl: row.image_url as string,
     color: row.color as string,
+    memberSince: (row.member_since as string | null | undefined) ?? undefined,
   };
 }
 
