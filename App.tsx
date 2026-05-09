@@ -196,12 +196,33 @@ function feeDueDateToDisplay(stored: string): string {
   return `${parts[1]}/${parts[2]}`; // MM/DD
 }
 
+function formatPurchaseDate(date: string): string {
+  const d = new Date(date + 'T00:00:00');
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+  d.setHours(0, 0, 0, 0);
+  if (d.getTime() === today.getTime()) return 'Today';
+  if (d.getTime() === yesterday.getTime()) return 'Yesterday';
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
 function todayMMDDYYYY(): string {
   const d = new Date();
   return `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}/${d.getFullYear()}`;
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
+
+const CATEGORY_META: Record<Purchase['category'], { icon: string; label: string }> = {
+  food:    { icon: 'utensils',        label: 'Food & Dining' },
+  grocery: { icon: 'basket-shopping', label: 'Grocery'       },
+  gas:     { icon: 'gas-pump',        label: 'Gas'           },
+  travel:  { icon: 'plane',           label: 'Travel'        },
+  online:  { icon: 'cart-shopping',   label: 'Online'        },
+  store:   { icon: 'bag-shopping',    label: 'In-Store'      },
+};
 
 const BENEFIT_LEGEND: { icon: string; label: string; description: string }[] = [
   { icon: 'plane',           label: 'Travel / Flights',          description: 'Airline tickets, Chase/Amex travel portals' },
@@ -652,6 +673,40 @@ export default function App() {
             </View>
           )}
 
+          {/* Recent Transactions */}
+          {purchases.length > 0 && (
+            <View style={ds.sectionCard}>
+              <Text style={ds.sectionTitle}>Recent Transactions</Text>
+              {[...purchases].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5).map((p) => {
+                const card = cards.find(c => c.id === p.cardId);
+                const meta = CATEGORY_META[p.category];
+                return (
+                  <View key={p.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                    <View style={{
+                      width: 36, height: 36, borderRadius: 10,
+                      backgroundColor: 'rgba(192,138,91,0.15)',
+                      justifyContent: 'center', alignItems: 'center', flexShrink: 0,
+                    }}>
+                      <FontAwesome6 name={meta.icon} size={15} color="#C08A5B" iconStyle="solid" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={ds.listName} numberOfLines={1}>{p.merchant}</Text>
+                      <Text style={ds.listSub}>
+                        {meta.label}{card ? ` · ${isDesktop ? card.name : abbreviateCardName(card.name)}` : ''}{card?.lastFour ? ` ••${card.lastFour}` : ''}
+                      </Text>
+                    </View>
+                    <View style={{ alignItems: 'flex-end', gap: 2 }}>
+                      <Text style={{ fontSize: 14, fontWeight: '700', color: '#2A211C' }}>
+                        -${p.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </Text>
+                      <Text style={ds.listSub}>{formatPurchaseDate(p.date)}</Text>
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          )}
+
           {/* Empty state */}
           {cards.length === 0 && (
             <View style={ds.homeEmpty}>
@@ -754,9 +809,14 @@ export default function App() {
                                 const available = !isNaN(limitNum) && spent > 0
                                   ? Math.max(0, limitNum - spent)
                                   : null;
+                                const nearLimit = available !== null && !isNaN(limitNum) && limitNum > 0
+                                  && available <= limitNum * 0.10;
                                 return (
-                                  <View style={styles.feeBadge}>
-                                    <Text style={styles.feeBadgeText}>
+                                  <View style={[styles.feeBadge, nearLimit && { backgroundColor: 'rgba(139,58,58,0.12)', borderWidth: 1, borderColor: '#ff3b30' }]}>
+                                    {nearLimit && (
+                                      <FontAwesome6 name="triangle-exclamation" size={10} color="#ff3b30" iconStyle="solid" />
+                                    )}
+                                    <Text style={[styles.feeBadgeText, nearLimit && { color: '#ff3b30' }]}>
                                       {available !== null
                                         ? `$${available.toLocaleString('en-US')}`
                                         : card.limit}
