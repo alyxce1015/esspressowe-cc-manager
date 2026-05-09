@@ -12,7 +12,7 @@ import { modalStyles } from './styles/modal';
 import { dashStyles as ds } from './styles/dashboard';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { CARD_CATALOG, ISSUERS, type CatalogCard } from './data/cards';
-import { getCards, insertCard, deleteCard, deleteCards, getPurchases, insertPurchase, type UserCard, type Purchase } from './db/database';
+import { getCards, insertCard, deleteCard, deleteCards, updateCard, getPurchases, insertPurchase, type UserCard, type Purchase } from './db/database';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -183,6 +183,19 @@ function abbreviateCardName(name: string): string {
     .replace(/Capital One/gi, 'Cap1');
 }
 
+function memberSinceToDisplay(stored: string): string {
+  const parts = stored.split('-');
+  if (parts.length < 2) return '';
+  return `${parts[1]}/${parts[0]}`; // MM/YYYY
+}
+
+function feeDueDateToDisplay(stored: string): string {
+  // stored: "2000-MM-DD"
+  const parts = stored.split('-');
+  if (parts.length < 3) return '';
+  return `${parts[1]}/${parts[2]}`; // MM/DD
+}
+
 function todayMMDDYYYY(): string {
   const d = new Date();
   return `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}/${d.getFullYear()}`;
@@ -221,6 +234,10 @@ export default function App() {
   const [deleteError, setDeleteError] = useState('');
   const [activeTab, setActiveTab] = useState<'home' | 'cards' | 'benefits' | 'more'>('home');
   const [, setTick] = useState(0);
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [editingCard, setEditingCard] = useState<UserCard | null>(null);
+  const [editForm, setEditForm] = useState({ customName: '', lastFour: '', dueDay: '', limit: '', memberSince: '', feeDueDate: '' });
+  const [editError, setEditError] = useState('');
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [purchaseModalVisible, setPurchaseModalVisible] = useState(false);
   const [purchaseForm, setPurchaseForm] = useState({
@@ -455,6 +472,50 @@ export default function App() {
       setPurchaseModalVisible(false);
     } catch (e) {
       setPurchaseError(e instanceof Error ? e.message : 'Could not save purchase.');
+    }
+  }
+
+  function openEditModal(card: UserCard) {
+    setEditingCard(card);
+    setEditForm({
+      customName: card.catalogId === 'custom' ? card.name : '',
+      lastFour: card.lastFour,
+      dueDay: String(card.dueDay),
+      limit: card.limit,
+      memberSince: card.memberSince ? memberSinceToDisplay(card.memberSince) : '',
+      feeDueDate: card.feeDueDate ? feeDueDateToDisplay(card.feeDueDate) : '',
+    });
+    setEditError('');
+    setEditModalVisible(true);
+  }
+
+  async function saveEdit() {
+    setEditError('');
+    if (!editingCard) return;
+    const dueDay = parseInt(editForm.dueDay, 10);
+    if (isNaN(dueDay) || dueDay < 1 || dueDay > 31) { setEditError('Enter a due day between 1 and 31.'); return; }
+    const isCustom = editingCard.catalogId === 'custom';
+    if (isCustom && !editForm.customName.trim()) { setEditError('Card name is required.'); return; }
+    const memberSince = editForm.memberSince.trim() ? parseMemberSince(editForm.memberSince) : undefined;
+    if (editForm.memberSince.trim() && !memberSince) { setEditError('Card Opened must be MM/YYYY.'); return; }
+    const catalogEntry = CARD_CATALOG.find(c => c.id === editingCard.catalogId);
+    const hasFee = (catalogEntry?.annualFee ?? 0) > 0;
+    const feeDueDate = hasFee && editForm.feeDueDate.trim() ? parseFeeDueDate(editForm.feeDueDate) : undefined;
+    if (hasFee && editForm.feeDueDate.trim() && !feeDueDate) { setEditError('Enter a valid fee due date (MM/DD).'); return; }
+    try {
+      await updateCard({
+        ...editingCard,
+        name: isCustom ? editForm.customName.trim() : editingCard.name,
+        lastFour: editForm.lastFour.trim(),
+        dueDay,
+        limit: editForm.limit.trim(),
+        memberSince,
+        feeDueDate,
+      });
+      setCards(await getCards());
+      setEditModalVisible(false);
+    } catch (e) {
+      setEditError(e instanceof Error ? e.message : 'Could not save changes.');
     }
   }
 
@@ -757,11 +818,18 @@ export default function App() {
                       </Pressable>
 
                       {!selectMode && (
-                        <Pressable style={styles.trashButton} onPress={() => handleDeleteOne(card.id)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                          {({ hovered, pressed }: { hovered?: boolean; pressed: boolean }) => (
-                            <FontAwesome6 name="trash" size={14} color={hovered || pressed ? '#ff0000' : '#ff3b30'} iconStyle="solid" />
-                          )}
-                        </Pressable>
+                        <View style={{ alignSelf: 'stretch', justifyContent: 'space-between', alignItems: 'center', paddingLeft: 4 }}>
+                          <Pressable onPress={() => openEditModal(card)} hitSlop={8}>
+                            {({ pressed }: { pressed: boolean }) => (
+                              <FontAwesome6 name="ellipsis" size={16} color={pressed ? '#C08A5B' : '#8C6E5A'} iconStyle="solid" />
+                            )}
+                          </Pressable>
+                          <Pressable onPress={() => handleDeleteOne(card.id)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                            {({ hovered, pressed }: { hovered?: boolean; pressed: boolean }) => (
+                              <FontAwesome6 name="trash" size={14} color={hovered || pressed ? '#ff0000' : '#ff3b30'} iconStyle="solid" />
+                            )}
+                          </Pressable>
+                        </View>
                       )}
                     </View>
                   </View>
@@ -1214,6 +1282,128 @@ export default function App() {
                 onPress={savePurchase}
               >
                 <Text style={styles.saveButtonText}>Save Purchase</Text>
+              </Pressable>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* ── EDIT CARD MODAL ── */}
+      <Modal visible={editModalVisible} animationType="slide" transparent>
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <View style={[styles.modalSheet, { maxHeight: windowHeight * 0.85 }]}>
+            <View style={styles.dragHandle} />
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Edit Card</Text>
+              <Pressable onPress={() => setEditModalVisible(false)} hitSlop={8}>
+                <Text style={styles.closeButton}>✕</Text>
+              </Pressable>
+            </View>
+
+            <ScrollView
+              style={{ flex: 1 }}
+              contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 20 }}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              {editingCard && (() => {
+                const catalogEntry = CARD_CATALOG.find(c => c.id === editingCard.catalogId);
+                const hasFee = (catalogEntry?.annualFee ?? 0) > 0;
+                const isCustom = editingCard.catalogId === 'custom';
+                return (
+                  <>
+                    {isCustom && (
+                      <>
+                        <Text style={styles.inputLabel}>Card Name</Text>
+                        <TextInput
+                          style={styles.input}
+                          placeholder="e.g. My Store Card"
+                          placeholderTextColor="#aeaeb2"
+                          value={editForm.customName}
+                          onChangeText={(v) => setEditForm(f => ({ ...f, customName: v }))}
+                        />
+                      </>
+                    )}
+
+                    <Text style={styles.inputLabel}>Last 4 Digits</Text>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="4821"
+                      placeholderTextColor="#aeaeb2"
+                      keyboardType="numeric"
+                      maxLength={4}
+                      value={editForm.lastFour}
+                      onChangeText={(v) => setEditForm(f => ({ ...f, lastFour: v }))}
+                    />
+
+                    <Text style={styles.inputLabel}>Due Day (1–31)</Text>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="15"
+                      placeholderTextColor="#aeaeb2"
+                      keyboardType="numeric"
+                      maxLength={2}
+                      value={editForm.dueDay}
+                      onChangeText={(v) => setEditForm(f => ({ ...f, dueDay: v }))}
+                    />
+
+                    <Text style={styles.inputLabel}>Credit Limit</Text>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="$10,000"
+                      placeholderTextColor="#aeaeb2"
+                      keyboardType="numeric"
+                      value={editForm.limit}
+                      onChangeText={(v) => setEditForm(f => ({ ...f, limit: formatCurrency(v) }))}
+                    />
+
+                    <Text style={styles.inputLabel}>Card Opened (MM/YYYY)</Text>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="04/2023"
+                      placeholderTextColor="#aeaeb2"
+                      keyboardType="numeric"
+                      value={editForm.memberSince}
+                      onChangeText={(v) => setEditForm(f => ({ ...f, memberSince: formatMemberSince(v) }))}
+                    />
+
+                    {hasFee && (
+                      <>
+                        <Text style={styles.inputLabel}>Fee Due Date (MM/DD)</Text>
+                        <TextInput
+                          style={styles.input}
+                          placeholder="05/09"
+                          placeholderTextColor="#aeaeb2"
+                          keyboardType="numeric"
+                          value={editForm.feeDueDate}
+                          onChangeText={(v) => setEditForm(f => ({ ...f, feeDueDate: formatFeeDueDateInput(v) }))}
+                        />
+                      </>
+                    )}
+
+                    {editError !== '' && (
+                      <Text style={styles.saveErrorText}>{editError}</Text>
+                    )}
+                  </>
+                );
+              })()}
+            </ScrollView>
+
+            <View style={styles.modalButtons}>
+              <Pressable
+                style={({ pressed }) => [styles.cancelButton, pressed && styles.cancelButtonPressed]}
+                onPress={() => setEditModalVisible(false)}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                style={({ pressed }) => [styles.saveButton, pressed && styles.saveButtonPressed]}
+                onPress={saveEdit}
+              >
+                <Text style={styles.saveButtonText}>Save Changes</Text>
               </Pressable>
             </View>
           </View>
