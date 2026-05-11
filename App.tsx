@@ -306,6 +306,87 @@ function buildTiers<T extends { benefit: Benefit }>(items: T[]): { multiplier: s
 }
 
 
+const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const DAY_LABELS = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+
+function CalendarPicker({ value, onSelect, onClose }: {
+  value: string;       // MM/DD/YYYY or ''
+  onSelect: (v: string) => void;
+  onClose: () => void;
+}) {
+  const parseDisplay = (v: string) => {
+    const m = v.trim().match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (m) { const d = new Date(+m[3], +m[1] - 1, +m[2]); if (!isNaN(d.getTime())) return d; }
+    return null;
+  };
+  const initial = parseDisplay(value) ?? new Date();
+  const [viewYear, setViewYear] = useState(initial.getFullYear());
+  const [viewMonth, setViewMonth] = useState(initial.getMonth());
+  const selected = parseDisplay(value);
+  const todayMs = (() => { const d = new Date(); d.setHours(0,0,0,0); return d.getTime(); })();
+
+  function prevMonth() { if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1); } else setViewMonth(m => m - 1); }
+  function nextMonth() { if (viewMonth === 11) { setViewMonth(0); setViewYear(y => y + 1); } else setViewMonth(m => m + 1); }
+
+  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+  const firstDow = new Date(viewYear, viewMonth, 1).getDay();
+  const cells: (number | null)[] = [...Array(firstDow).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => i + 1)];
+
+  return (
+    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center' }} onPress={onClose}>
+        <Pressable onPress={() => {}} style={{ backgroundColor: '#F4EDE4', borderRadius: 20, padding: 20, width: 320, borderWidth: 1, borderColor: '#CBB9A8', shadowColor: '#2B1D17', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.35, shadowRadius: 20, elevation: 10 }}>
+          {/* Month nav */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+            <Pressable onPress={prevMonth} hitSlop={12} style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}>
+              <FontAwesome6 name="chevron-left" size={14} color="#6F4E37" iconStyle="solid" />
+            </Pressable>
+            <Text style={{ fontSize: 16, fontWeight: '700', color: '#2A211C' }}>{MONTH_NAMES[viewMonth]} {viewYear}</Text>
+            <Pressable onPress={nextMonth} hitSlop={12} style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}>
+              <FontAwesome6 name="chevron-right" size={14} color="#6F4E37" iconStyle="solid" />
+            </Pressable>
+          </View>
+          {/* Day-of-week labels */}
+          <View style={{ flexDirection: 'row', marginBottom: 6 }}>
+            {DAY_LABELS.map(l => (
+              <Text key={l} style={{ flex: 1, textAlign: 'center', fontSize: 11, fontWeight: '700', color: '#8C6E5A' }}>{l}</Text>
+            ))}
+          </View>
+          {/* Day grid */}
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+            {cells.map((day, i) => {
+              if (!day) return <View key={`e${i}`} style={{ width: '14.28%', aspectRatio: 1 }} />;
+              const ms = new Date(viewYear, viewMonth, day).setHours(0,0,0,0);
+              const isToday = ms === todayMs;
+              const isSel = selected ? new Date(selected).setHours(0,0,0,0) === ms : false;
+              return (
+                <Pressable
+                  key={day}
+                  onPress={() => {
+                    const mm = String(viewMonth + 1).padStart(2, '0');
+                    const dd = String(day).padStart(2, '0');
+                    onSelect(`${mm}/${dd}/${viewYear}`);
+                    onClose();
+                  }}
+                  style={({ pressed }) => ({
+                    width: '14.28%', aspectRatio: 1,
+                    justifyContent: 'center', alignItems: 'center', borderRadius: 100,
+                    backgroundColor: isSel ? '#C08A5B' : isToday ? 'rgba(192,138,91,0.18)' : pressed ? 'rgba(192,138,91,0.12)' : 'transparent',
+                  })}
+                >
+                  <Text style={{ fontSize: 13, fontWeight: isSel || isToday ? '700' : '400', color: isSel ? '#fff' : isToday ? '#C08A5B' : '#2A211C' }}>
+                    {day}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
 export default function App() {
   const [fontsLoaded] = useFonts(FontAwesome6.font);
   const { height: windowHeight, width: windowWidth } = useWindowDimensions();
@@ -338,6 +419,7 @@ export default function App() {
   });
   const [purchaseError, setPurchaseError] = useState('');
   const [legendVisible, setLegendVisible] = useState(false);
+  const [calendarVisible, setCalendarVisible] = useState(false);
   const [benefitCategoryFilter, setBenefitCategoryFilter] = useState('All');
   const [benefitFilterOpen, setBenefitFilterOpen] = useState(false);
 
@@ -1810,14 +1892,34 @@ export default function App() {
 
               {/* Date */}
               <Text style={styles.inputLabel}>Date Purchased (MM/DD/YYYY)</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="05/09/2026"
-                placeholderTextColor="#aeaeb2"
-                keyboardType="numeric"
-                value={purchaseForm.date}
-                onChangeText={(v) => setPurchaseForm(f => ({ ...f, date: formatDateInput(v) }))}
-              />
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <TextInput
+                  style={[styles.input, { flex: 1 }]}
+                  placeholder="05/09/2026"
+                  placeholderTextColor="#aeaeb2"
+                  keyboardType="numeric"
+                  value={purchaseForm.date}
+                  onChangeText={(v) => setPurchaseForm(f => ({ ...f, date: formatDateInput(v) }))}
+                />
+                <Pressable
+                  onPress={() => setCalendarVisible(true)}
+                  style={({ pressed }) => ({
+                    width: 44, height: 44, borderRadius: 12,
+                    backgroundColor: pressed ? '#EDE1D4' : '#F4EDE4',
+                    borderWidth: 1, borderColor: '#CBB9A8',
+                    justifyContent: 'center', alignItems: 'center',
+                  })}
+                >
+                  <FontAwesome6 name="calendar-days" size={16} color="#6F4E37" iconStyle="solid" />
+                </Pressable>
+              </View>
+              {calendarVisible && (
+                <CalendarPicker
+                  value={purchaseForm.date}
+                  onSelect={(v) => setPurchaseForm(f => ({ ...f, date: v }))}
+                  onClose={() => setCalendarVisible(false)}
+                />
+              )}
 
               {purchaseError !== '' && (
                 <Text style={styles.saveErrorText}>{purchaseError}</Text>
