@@ -18,13 +18,13 @@
       "bundleIdentifier": "com.xander.creditcardmanager"
     },
     "android": {
+      "package": "com.xander.creditcardmanager",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false,
-      "package": "com.xander.creditcardmanager"
+      "predictiveBackGestureEnabled": false
     },
     "web": {
       "favicon": "./assets/favicon.png"
