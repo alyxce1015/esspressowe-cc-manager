@@ -12,7 +12,19 @@ import { modalStyles } from './styles/modal';
 import { dashStyles as ds } from './styles/dashboard';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { CARD_CATALOG, ISSUERS, type CatalogCard, type Benefit } from './data/cards';
-import { getCards, insertCard, deleteCard, deleteCards, updateCard, setCardPaidDate, getPurchases, insertPurchase, clearAllData, type UserCard, type Purchase } from './db/database';
+import { getCards, insertCard, deleteCard, deleteCards, updateCard, setCardPaidDate, getPurchases, insertPurchase, clearAllData, plaidGetLinkToken, plaidExchangeToken, plaidSyncLiabilities, plaidSyncTransactions, type UserCard, type Purchase } from './db/database';
+
+// ─── Plaid SDK (native only) ──────────────────────────────────────────────────
+
+let _plaidCreate: ((config: { token: string }) => void) | null = null;
+let _plaidOpen: ((props: { onSuccess: (s: any) => void; onExit: (e: any) => void }) => void) | null = null;
+if (Platform.OS !== 'web') {
+  try {
+    const sdk = require('react-native-plaid-link-sdk');
+    _plaidCreate = sdk.create;
+    _plaidOpen = sdk.open;
+  } catch {}
+}
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -186,6 +198,15 @@ function currentDueDate(dueDay: number): string {
 
 function isCardPaid(card: UserCard): boolean {
   return !!card.paidDate && card.paidDate === currentDueDate(card.dueDay);
+}
+
+function formatSyncedTime(iso: string): string {
+  const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
 }
 
 function abbreviateCardName(name: string): string {
@@ -422,6 +443,8 @@ export default function App() {
   const [calendarVisible, setCalendarVisible] = useState(false);
   const [benefitCategoryFilter, setBenefitCategoryFilter] = useState('All');
   const [benefitFilterOpen, setBenefitFilterOpen] = useState(false);
+  const [connectingCardId, setConnectingCardId] = useState<string | null>(null);
+  const [syncingCardId, setSyncingCardId] = useState<string | null>(null);
 
   const stepAnim = useRef(new Animated.Value(1)).current;
 
@@ -647,6 +670,57 @@ export default function App() {
       await setCardPaidDate(card.id, newPaidDate);
     } catch {
       // keep optimistic state even if DB save fails
+    }
+  }
+
+  async function handleConnectBank(card: UserCard) {
+    if (!_plaidCreate || !_plaidOpen) return;
+    setConnectingCardId(card.id);
+    try {
+      const token = await plaidGetLinkToken();
+      _plaidCreate({ token });
+      _plaidOpen({
+        onSuccess: async (success: any) => {
+          try {
+            const account = success.metadata?.accounts?.[0];
+            await plaidExchangeToken({
+              publicToken: success.publicToken,
+              accountId: account?.id ?? '',
+              cardId: card.id,
+              institutionName: success.metadata?.institution?.name ?? '',
+              institutionId: success.metadata?.institution?.id ?? '',
+            });
+            setCards(await getCards());
+          } catch (e) {
+            Alert.alert('Connection failed', e instanceof Error ? e.message : 'Could not link account');
+          } finally {
+            setConnectingCardId(null);
+          }
+        },
+        onExit: (exit: any) => {
+          setConnectingCardId(null);
+          if (exit?.error?.displayMessage) {
+            Alert.alert('Link error', exit.error.displayMessage);
+          }
+        },
+      });
+    } catch (e) {
+      setConnectingCardId(null);
+      Alert.alert('Error', e instanceof Error ? e.message : 'Could not start bank connection');
+    }
+  }
+
+  async function handleSyncCard(card: UserCard) {
+    setSyncingCardId(card.id);
+    try {
+      await Promise.all([plaidSyncLiabilities(card.id), plaidSyncTransactions(card.id)]);
+      const [newCards, newPurchases] = await Promise.all([getCards(), getPurchases()]);
+      setCards(newCards);
+      setPurchases(newPurchases);
+    } catch (e) {
+      Alert.alert('Sync failed', e instanceof Error ? e.message : 'Could not sync data');
+    } finally {
+      setSyncingCardId(null);
     }
   }
 
@@ -1026,6 +1100,65 @@ export default function App() {
                             {isCardPaid(card) ? 'Paid' : 'Mark Paid'}
                           </Text>
                         </Pressable>
+
+                        {/* Plaid Connect button (native only, not yet linked) */}
+                        {Platform.OS !== 'web' && !card.plaidAccountId && (
+                          <Pressable
+                            onPress={() => handleConnectBank(card)}
+                            disabled={connectingCardId === card.id}
+                            style={({ pressed }) => ({
+                              alignSelf: 'stretch' as const,
+                              flexDirection: 'row' as const,
+                              alignItems: 'center' as const,
+                              justifyContent: 'center' as const,
+                              gap: 4,
+                              paddingVertical: 5,
+                              borderRadius: 8,
+                              marginTop: 4,
+                              backgroundColor: 'rgba(122,158,126,0.1)',
+                              borderWidth: 1,
+                              borderColor: 'rgba(122,158,126,0.3)',
+                              opacity: pressed || connectingCardId === card.id ? 0.5 : 1,
+                            })}
+                          >
+                            <FontAwesome6 name="building-columns" size={9} color="#7A9E7E" iconStyle="solid" />
+                            <Text style={{ fontSize: 9, fontWeight: '600', color: '#7A9E7E' }}>
+                              {connectingCardId === card.id ? '...' : 'Connect'}
+                            </Text>
+                          </Pressable>
+                        )}
+
+                        {/* Plaid Sync button (linked card) */}
+                        {card.plaidAccountId && (
+                          <View style={{ alignSelf: 'stretch' as const, marginTop: 4, gap: 2 }}>
+                            <Pressable
+                              onPress={() => handleSyncCard(card)}
+                              disabled={syncingCardId === card.id}
+                              style={({ pressed }) => ({
+                                flexDirection: 'row' as const,
+                                alignItems: 'center' as const,
+                                justifyContent: 'center' as const,
+                                gap: 4,
+                                paddingVertical: 5,
+                                borderRadius: 8,
+                                backgroundColor: 'rgba(122,158,126,0.1)',
+                                borderWidth: 1,
+                                borderColor: 'rgba(122,158,126,0.3)',
+                                opacity: pressed || syncingCardId === card.id ? 0.5 : 1,
+                              })}
+                            >
+                              <FontAwesome6 name="arrows-rotate" size={9} color="#7A9E7E" iconStyle="solid" />
+                              <Text style={{ fontSize: 9, fontWeight: '600', color: '#7A9E7E' }}>
+                                {syncingCardId === card.id ? 'Syncing' : 'Sync'}
+                              </Text>
+                            </Pressable>
+                            {card.lastSyncedAt && (
+                              <Text style={{ fontSize: 8, color: '#6F4E37', textAlign: 'center' as const }}>
+                                {formatSyncedTime(card.lastSyncedAt)}
+                              </Text>
+                            )}
+                          </View>
+                        )}
                       </View>
 
                       <Pressable
@@ -1080,10 +1213,58 @@ export default function App() {
                                   </View>
                                 );
                               })() : null}
+                            {card.plaidAccountId && (
+                              <View style={[styles.feeBadge, { backgroundColor: 'rgba(122,158,126,0.15)', borderWidth: 1, borderColor: 'rgba(122,158,126,0.35)' }]}>
+                                <FontAwesome6 name="building-columns" size={9} color="#7A9E7E" iconStyle="solid" />
+                                <Text style={[styles.feeBadgeText, { color: '#7A9E7E' }]}>Synced</Text>
+                              </View>
+                            )}
                             </View>
                           </View>
 
                           <Text style={styles.cardLast4}>•••• {card.lastFour}</Text>
+
+                          {/* Plaid balance data */}
+                          {card.plaidAccountId && (card.currentBalance !== undefined || card.availableCredit !== undefined || card.minimumPayment !== undefined || card.nextPaymentDue) && (
+                            <View style={{ gap: 4, marginTop: 6, marginBottom: 2 }}>
+                              {(card.currentBalance !== undefined || card.availableCredit !== undefined) && (
+                                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 5 }}>
+                                  {card.currentBalance !== undefined && (
+                                    <View style={{ backgroundColor: 'rgba(122,158,126,0.12)', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 }}>
+                                      <Text style={{ fontSize: 10, color: '#7A9E7E', fontWeight: '600' }}>
+                                        {'Bal: $' + card.currentBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                      </Text>
+                                    </View>
+                                  )}
+                                  {card.availableCredit !== undefined && (
+                                    <View style={{ backgroundColor: 'rgba(122,158,126,0.12)', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 }}>
+                                      <Text style={{ fontSize: 10, color: '#7A9E7E', fontWeight: '600' }}>
+                                        {'Avail: $' + card.availableCredit.toLocaleString('en-US')}
+                                      </Text>
+                                    </View>
+                                  )}
+                                </View>
+                              )}
+                              {(card.minimumPayment !== undefined || card.nextPaymentDue) && (
+                                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 5 }}>
+                                  {card.minimumPayment !== undefined && (
+                                    <View style={{ backgroundColor: 'rgba(192,138,91,0.1)', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 }}>
+                                      <Text style={{ fontSize: 10, color: '#C08A5B', fontWeight: '600' }}>
+                                        {'Min: $' + card.minimumPayment.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                      </Text>
+                                    </View>
+                                  )}
+                                  {card.nextPaymentDue && (
+                                    <View style={{ backgroundColor: 'rgba(192,138,91,0.1)', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 }}>
+                                      <Text style={{ fontSize: 10, color: '#C08A5B', fontWeight: '600' }}>
+                                        {'Due: ' + new Date(card.nextPaymentDue + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                      </Text>
+                                    </View>
+                                  )}
+                                </View>
+                              )}
+                            </View>
+                          )}
 
                           {annualFee === 0 ? (
                             <View style={styles.noFeePill}>
