@@ -4,7 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import {
   Text, View, ScrollView, Pressable, TouchableOpacity,
   Modal, TextInput, KeyboardAvoidingView, Platform, Image,
-  useWindowDimensions, Animated, Linking,
+  useWindowDimensions, Animated, Linking, Alert,
 } from 'react-native';
 import { layoutStyles } from './styles/layout';
 import { cardStyles } from './styles/card';
@@ -12,7 +12,7 @@ import { modalStyles } from './styles/modal';
 import { dashStyles as ds } from './styles/dashboard';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { CARD_CATALOG, ISSUERS, type CatalogCard, type Benefit } from './data/cards';
-import { getCards, insertCard, deleteCard, deleteCards, updateCard, setCardPaidDate, getPurchases, insertPurchase, type UserCard, type Purchase } from './db/database';
+import { getCards, insertCard, deleteCard, deleteCards, updateCard, setCardPaidDate, getPurchases, insertPurchase, clearAllData, type UserCard, type Purchase } from './db/database';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -565,6 +565,30 @@ export default function App() {
       await setCardPaidDate(card.id, newPaidDate);
     } catch {
       // keep optimistic state even if DB save fails
+    }
+  }
+
+  async function handleClearAllData() {
+    const message = 'This will permanently delete all your cards and purchases. This cannot be undone.';
+    const confirmed = Platform.OS === 'web'
+      ? window.confirm(message)
+      : await new Promise<boolean>(resolve =>
+          Alert.alert('Clear All Data', message, [
+            { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+            { text: 'Clear Everything', style: 'destructive', onPress: () => resolve(true) },
+          ])
+        );
+    if (!confirmed) return;
+    try {
+      await clearAllData();
+      setCards([]);
+      setPurchases([]);
+    } catch {
+      if (Platform.OS === 'web') {
+        window.alert('Something went wrong. Please try again.');
+      } else {
+        Alert.alert('Error', 'Something went wrong. Please try again.');
+      }
     }
   }
 
@@ -1363,9 +1387,40 @@ export default function App() {
 
       {/* ── MORE TAB ── */}
       {activeTab === 'more' && (
-        <View style={ds.placeholder}>
-          <Text style={ds.placeholderText}>More — Coming Soon</Text>
-        </View>
+        <ScrollView style={ds.homeScroll} contentContainerStyle={ds.homeScrollContent}>
+          <Text style={ds.appTitle}>More</Text>
+
+          <View style={ds.sectionCard}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: 'rgba(255,59,48,0.12)', justifyContent: 'center', alignItems: 'center' }}>
+                <FontAwesome6 name="trash-can" size={16} color="#ff3b30" iconStyle="solid" />
+              </View>
+              <Text style={[ds.sectionTitle, { marginBottom: 0 }]}>Clear All Data</Text>
+            </View>
+
+            <Text style={{ fontSize: 13, color: '#6F4E37', lineHeight: 20 }}>
+              This will permanently remove all of your saved cards and every purchase you have logged. Your card catalog preferences, spending history, and payment records will all be erased and cannot be recovered.
+            </Text>
+            <Text style={{ fontSize: 13, color: '#8C6E5A', lineHeight: 20 }}>
+              Use this if you want to start fresh or remove all personal data from the app.
+            </Text>
+
+            <Pressable
+              onPress={handleClearAllData}
+              style={({ pressed }) => ({
+                marginTop: 4,
+                paddingVertical: 13,
+                borderRadius: 12,
+                alignItems: 'center' as const,
+                backgroundColor: pressed ? 'rgba(255,59,48,0.18)' : 'rgba(255,59,48,0.1)',
+                borderWidth: 1,
+                borderColor: 'rgba(255,59,48,0.3)',
+              })}
+            >
+              <Text style={{ fontSize: 14, fontWeight: '700', color: '#ff3b30' }}>Clear All Data</Text>
+            </Pressable>
+          </View>
+        </ScrollView>
       )}
 
       {/* ── BOTTOM TAB BAR ── */}

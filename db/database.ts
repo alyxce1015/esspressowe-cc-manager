@@ -157,3 +157,17 @@ export async function deletePurchase(id: string): Promise<void> {
 
   if (error) throw new Error(error.message);
 }
+
+export async function clearAllData(): Promise<void> {
+  const { error: purchasesError } = await supabase
+    .from('purchases')
+    .delete()
+    .not('id', 'is', null);
+  if (purchasesError) throw new Error(purchasesError.message);
+
+  const { error: cardsError } = await supabase
+    .from('cards')
+    .delete()
+    .not('id', 'is', null);
+  if (cardsError) throw new Error(cardsError.message);
+}
