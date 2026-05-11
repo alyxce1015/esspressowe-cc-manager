@@ -4,14 +4,14 @@ import { StatusBar } from 'expo-status-bar';
 import {
   Text, View, ScrollView, Pressable, TouchableOpacity,
   Modal, TextInput, KeyboardAvoidingView, Platform, Image,
-  useWindowDimensions, Animated,
+  useWindowDimensions, Animated, Linking,
 } from 'react-native';
 import { layoutStyles } from './styles/layout';
 import { cardStyles } from './styles/card';
 import { modalStyles } from './styles/modal';
 import { dashStyles as ds } from './styles/dashboard';
 import { FontAwesome6 } from '@expo/vector-icons';
-import { CARD_CATALOG, ISSUERS, type CatalogCard } from './data/cards';
+import { CARD_CATALOG, ISSUERS, type CatalogCard, type Benefit } from './data/cards';
 import { getCards, insertCard, deleteCard, deleteCards, updateCard, getPurchases, insertPurchase, type UserCard, type Purchase } from './db/database';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -237,6 +237,61 @@ const BENEFIT_LEGEND: { icon: string; label: string; description: string }[] = [
   { icon: 'money-bill',      label: 'All Purchases',             description: 'Base rate on everything else' },
 ];
 
+const BENEFIT_CATEGORY_MAP: Record<string, { display: string; icon: string }> = {
+  'Travel':       { display: 'Travel',           icon: 'plane'           },
+  'Hotels':       { display: 'Hotels',           icon: 'hotel'           },
+  'Dining':       { display: 'Dining',           icon: 'utensils'        },
+  'Groceries':    { display: 'Groceries',        icon: 'basket-shopping' },
+  'Gas':          { display: 'Gas',              icon: 'gas-pump'        },
+  'Drugstore':    { display: 'Drugstore',        icon: 'store'           },
+  'Online':       { display: 'Online Shopping',  icon: 'cart-shopping'   },
+  'Streaming':    { display: 'Streaming',        icon: 'tv'              },
+  'Car Rental':   { display: 'Car Rental',       icon: 'car'             },
+  'Rent':         { display: 'Rent',             icon: 'house'           },
+  'Transit':      { display: 'Transit',          icon: 'train'           },
+  'All Purchases':{ display: 'All Purchases',    icon: 'money-bill'      },
+};
+
+const CATEGORY_DISPLAY_ORDER = ['Travel','Hotels','Dining','Groceries','Gas','Drugstore','Online','Streaming','Car Rental','Rent','Transit'];
+
+function normalizeCategory(cat: string): string {
+  const lower = cat.toLowerCase();
+  if (lower.includes('travel') || lower.includes('flight')) return 'Travel';
+  if (lower.includes('hotel')) return 'Hotels';
+  if (lower.includes('dining')) return 'Dining';
+  if (lower.includes('grocer')) return 'Groceries';
+  if (lower.includes('gas')) return 'Gas';
+  if (lower.includes('drugstore')) return 'Drugstore';
+  if (lower.includes('online')) return 'Online';
+  if (lower.includes('streaming')) return 'Streaming';
+  if (lower.includes('car rental') || lower.includes('rental')) return 'Car Rental';
+  if (lower.includes('rent')) return 'Rent';
+  if (lower.includes('transit')) return 'Transit';
+  if (lower.includes('all purchases')) return 'All Purchases';
+  return cat;
+}
+
+function parseMultiplier(m: string): number {
+  const n = parseFloat(m.replace(/[^0-9.]/g, ''));
+  return isNaN(n) ? 0 : n;
+}
+
+function isRotatingBenefit(cat: string): boolean {
+  const lower = cat.toLowerCase();
+  return lower.includes('rotating') || lower.includes('choice') || lower.includes('top category');
+}
+
+function buildTiers<T extends { benefit: Benefit }>(items: T[]): { multiplier: string; value: number; items: T[] }[] {
+  const tiers: { multiplier: string; value: number; items: T[] }[] = [];
+  for (const item of items) {
+    const val = parseMultiplier(item.benefit.multiplier);
+    const last = tiers[tiers.length - 1];
+    if (last && last.value === val) { last.items.push(item); }
+    else if (tiers.length < 2) { tiers.push({ multiplier: item.benefit.multiplier, value: val, items: [item] }); }
+  }
+  return tiers;
+}
+
 
 export default function App() {
   const [fontsLoaded] = useFonts(FontAwesome6.font);
@@ -270,6 +325,8 @@ export default function App() {
   });
   const [purchaseError, setPurchaseError] = useState('');
   const [legendVisible, setLegendVisible] = useState(false);
+  const [benefitCategoryFilter, setBenefitCategoryFilter] = useState('All');
+  const [benefitFilterOpen, setBenefitFilterOpen] = useState(false);
 
   const stepAnim = useRef(new Animated.Value(1)).current;
 
@@ -452,6 +509,29 @@ export default function App() {
   const feeInsight = feesUpcoming.length > 0
     ? `${feesUpcoming[0].name} · annual fee in ${feesUpcoming[0].days} days`
     : null;
+
+  const walletBenefitItems = cards.flatMap(card => {
+    const catalog = CARD_CATALOG.find(c => c.id === card.catalogId);
+    if (!catalog) return [];
+    return catalog.benefits.map(b => ({ card, catalog, benefit: b }));
+  });
+  const rotatingBenefitItems = walletBenefitItems.filter(item => isRotatingBenefit(item.benefit.category));
+  const explicitBenefitItems = walletBenefitItems.filter(item =>
+    !isRotatingBenefit(item.benefit.category) && item.benefit.category !== 'All Purchases'
+  );
+  const allPurchasesBenefitItems = walletBenefitItems.filter(item =>
+    item.benefit.category === 'All Purchases'
+  );
+  const walletExplicitCategories = CATEGORY_DISPLAY_ORDER.filter(cat =>
+    explicitBenefitItems.some(item => normalizeCategory(item.benefit.category) === cat)
+  );
+  const numBenefitCols = isDesktop ? 3 : 2;
+  const catCardWidth = (windowWidth - 32 - (numBenefitCols - 1) * 14) / numBenefitCols;
+  const benefitImgWidth = Math.min(Math.round(catCardWidth - 28), 200);
+  const benefitImgHeight = Math.round(benefitImgWidth * 0.631);
+  const allPurchasesTiers = buildTiers(
+    [...allPurchasesBenefitItems].sort((a, b) => parseMultiplier(b.benefit.multiplier) - parseMultiplier(a.benefit.multiplier))
+  );
 
   function handleTabPress(tab: typeof activeTab) {
     if (tab !== 'cards') exitSelectMode();
@@ -937,12 +1017,243 @@ export default function App() {
         </View>
       )}
 
-      {/* ── BENEFITS / MORE placeholders ── */}
-      {(activeTab === 'benefits' || activeTab === 'more') && (
+      {/* ── BENEFITS TAB ── */}
+      {activeTab === 'benefits' && (
+        <ScrollView style={ds.homeScroll} contentContainerStyle={ds.homeScrollContent} showsVerticalScrollIndicator={false}>
+
+          <Text style={{ fontSize: 28, fontWeight: '800', color: '#F4EDE4', letterSpacing: -0.5, marginBottom: 4 }}>Benefits</Text>
+
+          {cards.length === 0 && (
+            <View style={ds.homeEmpty}>
+              <FontAwesome6 name="star" size={44} color="#CBB9A8" iconStyle="solid" />
+              <Text style={ds.homeEmptyTitle}>No cards yet</Text>
+              <Text style={ds.homeEmptySub}>Add cards to see your benefits breakdown</Text>
+            </View>
+          )}
+
+          {/* Category filter dropdown */}
+          {walletExplicitCategories.length > 0 && (
+            <View style={{ backgroundColor: '#2B1D17', borderRadius: 14, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(192,138,91,0.18)' }}>
+              <Pressable
+                style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14 }}
+                onPress={() => setBenefitFilterOpen(v => !v)}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <FontAwesome6 name="filter" size={13} color="#C08A5B" iconStyle="solid" />
+                  <Text style={{ fontSize: 14, fontWeight: '600', color: '#F4EDE4' }}>
+                    {benefitCategoryFilter === 'All' ? 'All Categories' : benefitCategoryFilter}
+                  </Text>
+                </View>
+                <FontAwesome6 name={benefitFilterOpen ? 'chevron-up' : 'chevron-down'} size={12} color="#8C6E5A" iconStyle="solid" />
+              </Pressable>
+              {benefitFilterOpen && (
+                <View style={{ borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.07)' }}>
+                  {(['All', ...walletExplicitCategories] as string[]).map(cat => {
+                    const active = benefitCategoryFilter === cat;
+                    const meta = BENEFIT_CATEGORY_MAP[cat];
+                    return (
+                      <Pressable
+                        key={cat}
+                        style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 12, backgroundColor: active ? 'rgba(192,138,91,0.15)' : 'transparent' }}
+                        onPress={() => { setBenefitCategoryFilter(cat); setBenefitFilterOpen(false); }}
+                      >
+                        <View style={{ width: 22, alignItems: 'center' }}>
+                          <FontAwesome6 name={cat === 'All' ? 'star' : (meta?.icon ?? 'circle')} size={13} color={active ? '#C08A5B' : '#6F4E37'} iconStyle="solid" />
+                        </View>
+                        <Text style={{ flex: 1, fontSize: 14, color: active ? '#C08A5B' : '#CBB9A8', fontWeight: active ? '700' : '400' }}>
+                          {cat === 'All' ? 'All Categories' : cat}
+                        </Text>
+                        {active && <FontAwesome6 name="check" size={12} color="#C08A5B" iconStyle="solid" />}
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              )}
+            </View>
+          )}
+
+          {/* Benefits grid — all cards unified */}
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 14 }}>
+
+            {/* Rotating / Choice */}
+            {rotatingBenefitItems.length > 0 && benefitCategoryFilter === 'All' && (
+              <View style={{ width: catCardWidth, backgroundColor: '#2B1D17', borderRadius: 16, padding: 14, gap: 12, borderWidth: 1, borderColor: 'rgba(192,138,91,0.2)', shadowColor: '#C08A5B', shadowOpacity: 0.14, shadowRadius: 10, shadowOffset: { width: 0, height: 2 }, elevation: 3 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: 'rgba(192,138,91,0.15)', justifyContent: 'center', alignItems: 'center' }}>
+                    <FontAwesome6 name="arrows-rotate" size={14} color="#C08A5B" iconStyle="solid" />
+                  </View>
+                  <Text style={{ fontSize: 15, fontWeight: '700', color: '#F4EDE4' }}>Rotating / Choice</Text>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6, backgroundColor: 'rgba(192,138,91,0.08)', borderRadius: 10, padding: 8 }}>
+                  <FontAwesome6 name="circle-info" size={11} color="#8C6E5A" iconStyle="solid" />
+                  <Text style={{ flex: 1, fontSize: 10, color: '#8C6E5A', lineHeight: 15 }}>
+                    Check your card's app for the current quarter's categories
+                  </Text>
+                </View>
+                <View style={{ flexDirection: 'row', justifyContent: 'center', flexWrap: 'wrap', gap: 12 }}>
+                  {rotatingBenefitItems.map((item, i) => (
+                    <View key={`${item.card.id}-rot-${i}`} style={{ alignItems: 'center', gap: 6 }}>
+                      <View style={{ width: benefitImgWidth, height: benefitImgHeight, borderRadius: 9, backgroundColor: item.card.color, overflow: 'hidden' }}>
+                        {item.catalog.image ? (
+                          <Image source={item.catalog.image} style={{ width: benefitImgWidth, height: benefitImgHeight }} resizeMode="cover" />
+                        ) : null}
+                        {item.catalog.url && (
+                          <Pressable
+                            style={{ position: 'absolute', top: 4, right: 4, width: 18, height: 18, borderRadius: 5, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', alignItems: 'center' }}
+                            onPress={() => Linking.openURL(item.catalog.url!)}
+                            hitSlop={4}
+                          >
+                            <FontAwesome6 name="arrow-up-right-from-square" size={8} color="#fff" iconStyle="solid" />
+                          </Pressable>
+                        )}
+                      </View>
+                      <View style={{ backgroundColor: 'rgba(192,138,91,0.2)', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 }}>
+                        <Text style={{ fontSize: 13, fontWeight: '700', color: '#C08A5B' }}>{item.benefit.multiplier}</Text>
+                      </View>
+                      {item.card.lastFour ? <Text style={{ fontSize: 9, color: '#6F4E37' }}>••{item.card.lastFour}</Text> : null}
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
+
+            {/* Per-category cards */}
+            {(benefitCategoryFilter === 'All' ? walletExplicitCategories : walletExplicitCategories.filter(c => c === benefitCategoryFilter)).map(cat => {
+              const catItems = explicitBenefitItems
+                .filter(item => normalizeCategory(item.benefit.category) === cat)
+                .sort((a, b) => parseMultiplier(b.benefit.multiplier) - parseMultiplier(a.benefit.multiplier));
+              const catMeta = BENEFIT_CATEGORY_MAP[cat];
+              const tiers = buildTiers(catItems);
+              return (
+                <View key={cat} style={{ width: catCardWidth, backgroundColor: '#2B1D17', borderRadius: 16, padding: 14, gap: 12, borderWidth: 1, borderColor: 'rgba(192,138,91,0.2)', shadowColor: '#C08A5B', shadowOpacity: 0.14, shadowRadius: 10, shadowOffset: { width: 0, height: 2 }, elevation: 3 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: 'rgba(192,138,91,0.15)', justifyContent: 'center', alignItems: 'center' }}>
+                      {catMeta && <FontAwesome6 name={catMeta.icon} size={14} color="#C08A5B" iconStyle="solid" />}
+                    </View>
+                    <Text style={{ fontSize: 15, fontWeight: '700', color: '#F4EDE4' }}>{catMeta?.display ?? cat}</Text>
+                  </View>
+                  {tiers.map((tier, tierIdx) => (
+                    <View key={tierIdx} style={tierIdx === 0 && tiers.length === 1 ? { flex: 1, justifyContent: 'center' } : undefined}>
+                      {tierIdx === 0 ? (
+                        <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 14, flexWrap: 'wrap' }}>
+                          {tier.items.map(item => (
+                            <View key={item.card.id} style={{ alignItems: 'center', gap: 6 }}>
+                              <View style={{ width: benefitImgWidth, height: benefitImgHeight, borderRadius: 9, backgroundColor: item.card.color, overflow: 'hidden' }}>
+                                {item.catalog.image ? (
+                                  <Image source={item.catalog.image} style={{ width: benefitImgWidth, height: benefitImgHeight }} resizeMode="cover" />
+                                ) : null}
+                                {item.catalog.url && (
+                                  <Pressable
+                                    style={{ position: 'absolute', top: 4, right: 4, width: 18, height: 18, borderRadius: 5, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', alignItems: 'center' }}
+                                    onPress={() => Linking.openURL(item.catalog.url!)}
+                                    hitSlop={4}
+                                  >
+                                    <FontAwesome6 name="arrow-up-right-from-square" size={8} color="#fff" iconStyle="solid" />
+                                  </Pressable>
+                                )}
+                              </View>
+                              <View style={{ backgroundColor: 'rgba(192,138,91,0.2)', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 }}>
+                                <Text style={{ fontSize: 13, fontWeight: '700', color: '#C08A5B' }}>{tier.multiplier}</Text>
+                              </View>
+                              {item.card.lastFour ? <Text style={{ fontSize: 9, color: '#6F4E37', textAlign: 'center' }}>••{item.card.lastFour}</Text> : null}
+                            </View>
+                          ))}
+                        </View>
+                      ) : (
+                        <View style={{ gap: 5, paddingTop: 4 }}>
+                          <View style={{ height: 1, backgroundColor: 'rgba(192,138,91,0.18)', marginBottom: 2 }} />
+                          <Text style={{ fontSize: 9, fontWeight: '700', color: '#6F4E37', letterSpacing: 0.8 }}>RUNNER-UP</Text>
+                          {tier.items.map(item => (
+                            <View key={item.card.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                              <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: item.card.color, flexShrink: 0 }} />
+                              <Text style={{ flex: 1, fontSize: 12, color: '#8C6E5A' }} numberOfLines={1}>
+                                {isDesktop ? item.card.name : abbreviateCardName(item.card.name)}{item.card.lastFour ? ` ••${item.card.lastFour}` : ''}
+                              </Text>
+                              {item.catalog.url && (
+                                <Pressable onPress={() => Linking.openURL(item.catalog.url!)} hitSlop={8}>
+                                  <FontAwesome6 name="arrow-up-right-from-square" size={10} color="#6F4E37" iconStyle="solid" />
+                                </Pressable>
+                              )}
+                              <Text style={{ fontSize: 12, fontWeight: '600', color: '#6F4E37' }}>{tier.multiplier}</Text>
+                            </View>
+                          ))}
+                        </View>
+                      )}
+                    </View>
+                  ))}
+                </View>
+              );
+            })}
+
+            {/* All Purchases base rate */}
+            {allPurchasesBenefitItems.length > 0 && benefitCategoryFilter === 'All' && (
+              <View style={{ width: catCardWidth, backgroundColor: '#2B1D17', borderRadius: 16, padding: 14, gap: 12, borderWidth: 1, borderColor: 'rgba(122,158,126,0.2)', shadowColor: '#7A9E7E', shadowOpacity: 0.14, shadowRadius: 10, shadowOffset: { width: 0, height: 2 }, elevation: 3 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: 'rgba(122,158,126,0.15)', justifyContent: 'center', alignItems: 'center' }}>
+                    <FontAwesome6 name="money-bill" size={14} color="#7A9E7E" iconStyle="solid" />
+                  </View>
+                  <Text style={{ fontSize: 15, fontWeight: '700', color: '#F4EDE4' }}>All Purchases</Text>
+                </View>
+                {allPurchasesTiers.map((tier, tierIdx) => (
+                  <View key={tierIdx} style={tierIdx === 0 && allPurchasesTiers.length === 1 ? { flex: 1, justifyContent: 'center' } : undefined}>
+                    {tierIdx === 0 ? (
+                      <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 14, flexWrap: 'wrap' }}>
+                        {tier.items.map(item => (
+                          <View key={item.card.id} style={{ alignItems: 'center', gap: 6 }}>
+                            <View style={{ width: benefitImgWidth, height: benefitImgHeight, borderRadius: 9, backgroundColor: item.card.color, overflow: 'hidden' }}>
+                              {item.catalog.image ? (
+                                <Image source={item.catalog.image} style={{ width: benefitImgWidth, height: benefitImgHeight }} resizeMode="cover" />
+                              ) : null}
+                              {item.catalog.url && (
+                                <Pressable
+                                  style={{ position: 'absolute', top: 4, right: 4, width: 18, height: 18, borderRadius: 5, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', alignItems: 'center' }}
+                                  onPress={() => Linking.openURL(item.catalog.url!)}
+                                  hitSlop={4}
+                                >
+                                  <FontAwesome6 name="arrow-up-right-from-square" size={8} color="#fff" iconStyle="solid" />
+                                </Pressable>
+                              )}
+                            </View>
+                            <View style={{ backgroundColor: 'rgba(122,158,126,0.2)', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 }}>
+                              <Text style={{ fontSize: 13, fontWeight: '700', color: '#7A9E7E' }}>{tier.multiplier}</Text>
+                            </View>
+                            {item.card.lastFour ? <Text style={{ fontSize: 9, color: '#6F4E37', textAlign: 'center' }}>••{item.card.lastFour}</Text> : null}
+                          </View>
+                        ))}
+                      </View>
+                    ) : (
+                      <View style={{ gap: 5, paddingTop: 4 }}>
+                        <View style={{ height: 1, backgroundColor: 'rgba(192,138,91,0.18)', marginBottom: 2 }} />
+                        <Text style={{ fontSize: 9, fontWeight: '700', color: '#6F4E37', letterSpacing: 0.8 }}>RUNNER-UP</Text>
+                        {tier.items.map(item => (
+                          <View key={item.card.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: item.card.color, flexShrink: 0 }} />
+                            <Text style={{ flex: 1, fontSize: 12, color: '#8C6E5A' }} numberOfLines={1}>
+                              {isDesktop ? item.card.name : abbreviateCardName(item.card.name)}{item.card.lastFour ? ` ••${item.card.lastFour}` : ''}
+                            </Text>
+                            {item.catalog.url && (
+                              <Pressable onPress={() => Linking.openURL(item.catalog.url!)} hitSlop={8}>
+                                <FontAwesome6 name="arrow-up-right-from-square" size={10} color="#6F4E37" iconStyle="solid" />
+                              </Pressable>
+                            )}
+                            <Text style={{ fontSize: 12, fontWeight: '600', color: '#6F4E37' }}>{tier.multiplier}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    )}
+                  </View>
+                ))}
+              </View>
+            )}
+
+          </View>
+        </ScrollView>
+      )}
+
+      {/* ── MORE TAB ── */}
+      {activeTab === 'more' && (
         <View style={ds.placeholder}>
-          <Text style={ds.placeholderText}>
-            {activeTab === 'benefits' ? 'Benefits — Coming Soon' : 'More — Coming Soon'}
-          </Text>
+          <Text style={ds.placeholderText}>More — Coming Soon</Text>
         </View>
       )}
 
