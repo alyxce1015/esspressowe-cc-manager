@@ -583,6 +583,11 @@ export default function App() {
       await clearAllData();
       setCards([]);
       setPurchases([]);
+      setBenefitCategoryFilter('All');
+      setBenefitFilterOpen(false);
+      setSelectMode(false);
+      setSelectedIds(new Set());
+      setActiveTab('home');
     } catch {
       if (Platform.OS === 'web') {
         window.alert('Something went wrong. Please try again.');
@@ -861,7 +866,7 @@ export default function App() {
         <View style={{ flex: 1, backgroundColor: '#5a473e', paddingTop: 60, paddingHorizontal: 20 }}>
           <View style={styles.headerRow}>
             <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 6 }}>
-              <Text style={styles.header}>My Cards</Text>
+              <Text style={[ds.appTitle, { textAlign: 'left' }]}>My Cards</Text>
               <Pressable onPress={() => setLegendVisible(true)} hitSlop={8} style={{ marginBottom: 4 }}>
                 <FontAwesome6 name="circle-info" size={15} color="#CBB9A8" iconStyle="solid" />
               </Pressable>
@@ -1111,7 +1116,7 @@ export default function App() {
       {activeTab === 'benefits' && (
         <ScrollView style={ds.homeScroll} contentContainerStyle={ds.homeScrollContent} showsVerticalScrollIndicator={false}>
 
-          <Text style={{ fontSize: 28, fontWeight: '800', color: '#F4EDE4', letterSpacing: -0.5, marginBottom: 4 }}>Benefits</Text>
+          <Text style={[ds.appTitle, { textAlign: 'left' }]}>Benefits</Text>
 
           {cards.length === 0 && (
             <View style={ds.homeEmpty}>
@@ -1388,7 +1393,7 @@ export default function App() {
       {/* ── MORE TAB ── */}
       {activeTab === 'more' && (
         <ScrollView style={ds.homeScroll} contentContainerStyle={ds.homeScrollContent}>
-          <Text style={ds.appTitle}>More</Text>
+          <Text style={[ds.appTitle, { textAlign: 'left' }]}>More</Text>
 
           <View style={ds.sectionCard}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
