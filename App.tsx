@@ -532,6 +532,12 @@ export default function App() {
   const allPurchasesTiers = buildTiers(
     [...allPurchasesBenefitItems].sort((a, b) => parseMultiplier(b.benefit.multiplier) - parseMultiplier(a.benefit.multiplier))
   );
+  const filteredCatItems = benefitCategoryFilter !== 'All'
+    ? explicitBenefitItems
+        .filter(item => normalizeCategory(item.benefit.category) === benefitCategoryFilter)
+        .sort((a, b) => parseMultiplier(b.benefit.multiplier) - parseMultiplier(a.benefit.multiplier))
+    : [];
+  const filteredCatMeta = BENEFIT_CATEGORY_MAP[benefitCategoryFilter];
 
   function handleTabPress(tab: typeof activeTab) {
     if (tab !== 'cards') exitSelectMode();
@@ -1072,11 +1078,12 @@ export default function App() {
             </View>
           )}
 
-          {/* Benefits grid — all cards unified */}
+          {/* Benefits grid — All categories */}
+          {benefitCategoryFilter === 'All' && (
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 14 }}>
 
             {/* Rotating / Choice */}
-            {rotatingBenefitItems.length > 0 && benefitCategoryFilter === 'All' && (
+            {rotatingBenefitItems.length > 0 && (
               <View style={{ width: catCardWidth, backgroundColor: '#2B1D17', borderRadius: 16, padding: 14, gap: 12, borderWidth: 1, borderColor: 'rgba(192,138,91,0.2)', shadowColor: '#C08A5B', shadowOpacity: 0.14, shadowRadius: 10, shadowOffset: { width: 0, height: 2 }, elevation: 3 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                   <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: 'rgba(192,138,91,0.15)', justifyContent: 'center', alignItems: 'center' }}>
@@ -1118,7 +1125,7 @@ export default function App() {
             )}
 
             {/* Per-category cards */}
-            {(benefitCategoryFilter === 'All' ? walletExplicitCategories : walletExplicitCategories.filter(c => c === benefitCategoryFilter)).map(cat => {
+            {walletExplicitCategories.map(cat => {
               const catItems = explicitBenefitItems
                 .filter(item => normalizeCategory(item.benefit.category) === cat)
                 .sort((a, b) => parseMultiplier(b.benefit.multiplier) - parseMultiplier(a.benefit.multiplier));
@@ -1186,7 +1193,7 @@ export default function App() {
             })}
 
             {/* All Purchases base rate */}
-            {allPurchasesBenefitItems.length > 0 && benefitCategoryFilter === 'All' && (
+            {allPurchasesBenefitItems.length > 0 && (
               <View style={{ width: catCardWidth, backgroundColor: '#2B1D17', borderRadius: 16, padding: 14, gap: 12, borderWidth: 1, borderColor: 'rgba(122,158,126,0.2)', shadowColor: '#7A9E7E', shadowOpacity: 0.14, shadowRadius: 10, shadowOffset: { width: 0, height: 2 }, elevation: 3 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                   <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: 'rgba(122,158,126,0.15)', justifyContent: 'center', alignItems: 'center' }}>
@@ -1247,6 +1254,50 @@ export default function App() {
             )}
 
           </View>
+          )}
+
+          {/* Filtered category — full ranking */}
+          {benefitCategoryFilter !== 'All' && (
+            <View style={{ backgroundColor: '#2B1D17', borderRadius: 16, padding: 16, gap: 14, borderWidth: 1, borderColor: 'rgba(192,138,91,0.2)', shadowColor: '#C08A5B', shadowOpacity: 0.14, shadowRadius: 10, shadowOffset: { width: 0, height: 2 }, elevation: 3 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: 'rgba(192,138,91,0.15)', justifyContent: 'center', alignItems: 'center' }}>
+                  {filteredCatMeta && <FontAwesome6 name={filteredCatMeta.icon} size={14} color="#C08A5B" iconStyle="solid" />}
+                </View>
+                <Text style={{ fontSize: 16, fontWeight: '700', color: '#F4EDE4' }}>{filteredCatMeta?.display ?? benefitCategoryFilter}</Text>
+                <Text style={{ fontSize: 12, color: '#6F4E37', marginLeft: 2 }}>— ranked</Text>
+              </View>
+              {filteredCatItems.length === 0 ? (
+                <Text style={{ fontSize: 13, color: '#8C6E5A' }}>No cards in your wallet earn for this category.</Text>
+              ) : (
+                filteredCatItems.map((item) => {
+                  const rank = filteredCatItems.filter(i => parseMultiplier(i.benefit.multiplier) > parseMultiplier(item.benefit.multiplier)).length + 1;
+                  const isTop = rank === 1;
+                  const accentColor = isTop ? '#C08A5B' : rank === 2 ? '#8C6E5A' : '#6F4E37';
+                  return (
+                    <View key={item.card.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                      <Text style={{ width: 28, fontSize: 13, fontWeight: '700', color: accentColor, textAlign: 'center' }}>#{rank}</Text>
+                      <View style={{ width: 64, height: 40, borderRadius: 6, backgroundColor: item.card.color, overflow: 'hidden', flexShrink: 0 }}>
+                        {item.catalog.image ? (
+                          <Image source={item.catalog.image} style={{ width: 64, height: 40 }} resizeMode="cover" />
+                        ) : null}
+                      </View>
+                      <Text style={{ flex: 1, fontSize: 13, color: '#F4EDE4', fontWeight: '500' }} numberOfLines={1}>
+                        {isDesktop ? item.card.name : abbreviateCardName(item.card.name)}{item.card.lastFour ? ` ••${item.card.lastFour}` : ''}
+                      </Text>
+                      {item.catalog.url && (
+                        <Pressable onPress={() => Linking.openURL(item.catalog.url!)} hitSlop={8}>
+                          <FontAwesome6 name="arrow-up-right-from-square" size={10} color="#6F4E37" iconStyle="solid" />
+                        </Pressable>
+                      )}
+                      <View style={{ backgroundColor: isTop ? 'rgba(192,138,91,0.2)' : 'rgba(255,255,255,0.06)', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 }}>
+                        <Text style={{ fontSize: 13, fontWeight: '700', color: accentColor }}>{item.benefit.multiplier}</Text>
+                      </View>
+                    </View>
+                  );
+                })
+              )}
+            </View>
+          )}
         </ScrollView>
       )}
 
