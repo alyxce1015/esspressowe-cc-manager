@@ -20,6 +20,7 @@ export type UserCard = {
   color: string;
   memberSince?: string;  // "YYYY-MM-01" — card opened month, shown on no-fee cards
   feeDueDate?: string;   // "YYYY-MM-DD" — exact annual fee due date, for fee cards
+  paidDate?: string;     // "YYYY-MM-DD" of the due date this card was marked paid for
 };
 
 function toRow(card: UserCard) {
@@ -49,6 +50,7 @@ function fromRow(row: Record<string, unknown>): UserCard {
     color: row.color as string,
     memberSince: (row.member_since as string | null | undefined) ?? undefined,
     feeDueDate: (row.fee_due_date as string | null | undefined) ?? undefined,
+    paidDate: (row.paid_date as string | null | undefined) ?? undefined,
   };
 }
 
@@ -85,6 +87,14 @@ export async function deleteCards(ids: string[]): Promise<void> {
     .delete()
     .in('id', ids);
 
+  if (error) throw new Error(error.message);
+}
+
+export async function setCardPaidDate(id: string, paidDate: string | null): Promise<void> {
+  const { error } = await supabase
+    .from('cards')
+    .update({ paid_date: paidDate })
+    .eq('id', id);
   if (error) throw new Error(error.message);
 }
 

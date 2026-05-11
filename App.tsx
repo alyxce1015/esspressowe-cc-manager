@@ -12,7 +12,7 @@ import { modalStyles } from './styles/modal';
 import { dashStyles as ds } from './styles/dashboard';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { CARD_CATALOG, ISSUERS, type CatalogCard, type Benefit } from './data/cards';
-import { getCards, insertCard, deleteCard, deleteCards, updateCard, getPurchases, insertPurchase, type UserCard, type Purchase } from './db/database';
+import { getCards, insertCard, deleteCard, deleteCards, updateCard, setCardPaidDate, getPurchases, insertPurchase, type UserCard, type Purchase } from './db/database';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -173,6 +173,19 @@ function parseDateInput(input: string): string | undefined {
   const d = new Date(year, month - 1, day);
   if (d.getMonth() !== month - 1 || d.getDate() !== day) return undefined;
   return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+function currentDueDate(dueDay: number): string {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  let due = new Date(today.getFullYear(), today.getMonth(), dueDay);
+  due.setHours(0, 0, 0, 0);
+  if (due < today) due = new Date(today.getFullYear(), today.getMonth() + 1, dueDay);
+  return due.toISOString().split('T')[0];
+}
+
+function isCardPaid(card: UserCard): boolean {
+  return !!card.paidDate && card.paidDate === currentDueDate(card.dueDay);
 }
 
 function abbreviateCardName(name: string): string {
@@ -502,8 +515,9 @@ export default function App() {
     .filter(c => c.days <= 15)
     .sort((a, b) => a.days - b.days);
 
-  const paymentInsight = sortedByDue.length > 0
-    ? `${sortedByDue[0].name} · ${sortedByDue[0].days === 0 ? 'Statement due today' : sortedByDue[0].days === 1 ? 'Statement due tomorrow' : `Statement due in ${sortedByDue[0].days} days`}`
+  const unpaidDue = sortedByDue.filter(c => !isCardPaid(c));
+  const paymentInsight = unpaidDue.length > 0
+    ? `${unpaidDue[0].name} · ${unpaidDue[0].days === 0 ? 'Statement due today' : unpaidDue[0].days === 1 ? 'Statement due tomorrow' : `Statement due in ${unpaidDue[0].days} days`}`
     : null;
 
   const feeInsight = feesUpcoming.length > 0
@@ -542,6 +556,16 @@ export default function App() {
   function handleTabPress(tab: typeof activeTab) {
     if (tab !== 'cards') exitSelectMode();
     setActiveTab(tab);
+  }
+
+  async function handleTogglePaid(card: UserCard) {
+    const newPaidDate = isCardPaid(card) ? null : currentDueDate(card.dueDay);
+    setCards(prev => prev.map(c => c.id === card.id ? { ...c, paidDate: newPaidDate ?? undefined } : c));
+    try {
+      await setCardPaidDate(card.id, newPaidDate);
+    } catch {
+      // keep optimistic state even if DB save fails
+    }
   }
 
   function openPurchaseModal() {
@@ -707,20 +731,24 @@ export default function App() {
             <View style={ds.sectionCard}>
               <Text style={ds.sectionTitle}>Upcoming Payments</Text>
               {sortedByDue.map((item) => {
-                const urgent = item.days <= 10;
-                const soon = !urgent && item.days <= 15;
-                const label = item.days === 0 ? 'Today' : item.days === 1 ? 'Tomorrow' : `${item.days}d`;
+                const paid = isCardPaid(item);
+                const urgent = !paid && item.days <= 10;
+                const soon = !paid && !urgent && item.days <= 15;
+                const label = paid ? 'Paid' : item.days === 0 ? 'Today' : item.days === 1 ? 'Tomorrow' : `${item.days}d`;
                 return (
                   <View key={item.id} style={ds.listRow}>
                     <View style={[ds.listDot, { backgroundColor: item.color }]} />
                     <Text style={ds.listName} numberOfLines={1}>{item.name}</Text>
+                    {paid && (
+                      <FontAwesome6 name="check" size={13} color="#7A9E7E" iconStyle="solid" />
+                    )}
                     {urgent && (
                       <FontAwesome6 name="triangle-exclamation" size={13} color="#ff3b30" iconStyle="solid" />
                     )}
                     {soon && (
                       <FontAwesome6 name="triangle-exclamation" size={13} color="#ff9500" iconStyle="solid" />
                     )}
-                    <Text style={[ds.listBadge, urgent && ds.listBadgeUrgent, soon && ds.listBadgeSoon]}>
+                    <Text style={[ds.listBadge, paid && { color: '#7A9E7E', backgroundColor: 'rgba(122,158,126,0.15)' }, urgent && ds.listBadgeUrgent, soon && ds.listBadgeSoon]}>
                       {label}
                     </Text>
                   </View>
@@ -844,6 +872,51 @@ export default function App() {
                 return (
                   <View key={card.id} style={isDesktop ? styles.cardGridItem : undefined}>
                     <View style={[styles.card, isSelected && styles.cardSelected, isDesktop && { flex: 1 }]}>
+                      <View style={styles.cardImageColumn}>
+                        <View style={[styles.cardImageWrap, { backgroundColor: card.color }]}>
+                          {imageSource
+                            ? <Image source={imageSource} style={styles.cardImage} resizeMode="cover" />
+                            : <Text style={styles.customCardLabel}>{card.name}</Text>
+                          }
+                        </View>
+                        {card.memberSince && (
+                          <>
+                            <Text style={styles.cardDateOpenedLabel}>{formatCardOpened(card.memberSince)}</Text>
+                            <Text style={styles.cardAgeLabel}>{getCardAge(card.memberSince)}</Text>
+                          </>
+                        )}
+                        {card.limit ? (
+                          <Text style={styles.cardDateOpenedLabel}>Limit: {card.limit}</Text>
+                        ) : null}
+                        <Pressable
+                          onPress={() => handleTogglePaid(card)}
+                          style={({ pressed }) => ({
+                            alignSelf: 'stretch' as const,
+                            flexDirection: 'row' as const,
+                            alignItems: 'center' as const,
+                            justifyContent: 'center' as const,
+                            gap: 4,
+                            paddingVertical: 5,
+                            borderRadius: 8,
+                            marginTop: 2,
+                            backgroundColor: isCardPaid(card) ? 'rgba(122,158,126,0.15)' : 'rgba(192,138,91,0.1)',
+                            borderWidth: 1,
+                            borderColor: isCardPaid(card) ? 'rgba(122,158,126,0.4)' : 'rgba(192,138,91,0.3)',
+                            opacity: pressed ? 0.7 : 1,
+                          })}
+                        >
+                          <FontAwesome6
+                            name={isCardPaid(card) ? 'check' : 'circle-check'}
+                            size={10}
+                            color={isCardPaid(card) ? '#7A9E7E' : '#C08A5B'}
+                            iconStyle="solid"
+                          />
+                          <Text style={{ fontSize: 10, fontWeight: '600', color: isCardPaid(card) ? '#7A9E7E' : '#C08A5B' }}>
+                            {isCardPaid(card) ? 'Paid' : 'Mark Paid'}
+                          </Text>
+                        </Pressable>
+                      </View>
+
                       <Pressable
                         style={({ pressed }) => [styles.cardInner, pressed && selectMode && styles.cardPressed]}
                         onPress={selectMode ? () => toggleSelect(card.id) : undefined}
@@ -854,37 +927,23 @@ export default function App() {
                           </View>
                         )}
 
-                        <View style={styles.cardImageColumn}>
-                          <View style={[styles.cardImageWrap, { backgroundColor: card.color }]}>
-                            {imageSource
-                              ? <Image source={imageSource} style={styles.cardImage} resizeMode="cover" />
-                              : <Text style={styles.customCardLabel}>{card.name}</Text>
-                            }
-                          </View>
-                          {card.memberSince && (
-                            <>
-                              <Text style={styles.cardDateOpenedLabel}>{formatCardOpened(card.memberSince)}</Text>
-                              <Text style={styles.cardAgeLabel}>{getCardAge(card.memberSince)}</Text>
-                            </>
-                          )}
-                          {card.limit ? (
-                            <Text style={styles.cardDateOpenedLabel}>Limit: {card.limit}</Text>
-                          ) : null}
-                        </View>
-
                         <View style={styles.cardInfo}>
                           <View style={[styles.cardNameRow, isDesktop && styles.cardNameRowDesktop]}>
                             <Text style={[styles.cardName, isDesktop && styles.cardNameDesktop]} numberOfLines={isDesktop ? 1 : 2}>{isDesktop ? card.name : abbreviateCardName(card.name)}</Text>
                             <View style={styles.cardBadgeRow}>
                               {(() => {
-                                const urgent = daysUntilDue(card.dueDay) <= 10;
+                                const paid = isCardPaid(card);
+                                const urgent = !paid && daysUntilDue(card.dueDay) <= 10;
                                 return (
-                                  <View style={[styles.feeBadge, urgent && styles.feeBadgeUrgent]}>
-                                    {urgent && (
-                                      <FontAwesome6 name="triangle-exclamation" size={10} color="#ff3b30" iconStyle="solid" />
-                                    )}
-                                    <Text style={[styles.feeBadgeText, urgent && styles.feeBadgeTextUrgent]}>
-                                      Statement Ends: {ordinal(card.dueDay)}
+                                  <View style={[styles.feeBadge, paid && { backgroundColor: 'rgba(122,158,126,0.15)', borderColor: 'rgba(122,158,126,0.4)', borderWidth: 1 }, urgent && styles.feeBadgeUrgent]}>
+                                    {paid
+                                      ? <FontAwesome6 name="check" size={10} color="#7A9E7E" iconStyle="solid" />
+                                      : urgent
+                                        ? <FontAwesome6 name="triangle-exclamation" size={10} color="#ff3b30" iconStyle="solid" />
+                                        : null
+                                    }
+                                    <Text style={[styles.feeBadgeText, paid && { color: '#7A9E7E' }, urgent && styles.feeBadgeTextUrgent]}>
+                                      {paid ? 'Paid' : `Statement Ends: ${ordinal(card.dueDay)}`}
                                     </Text>
                                   </View>
                                 );
@@ -972,6 +1031,7 @@ export default function App() {
                               </View>
                             );
                           })()}
+
                         </View>
                       </Pressable>
 
