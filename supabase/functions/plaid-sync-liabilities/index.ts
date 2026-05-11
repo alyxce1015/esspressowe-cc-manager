@@ -67,6 +67,13 @@ Deno.serve(async (req) => {
   })
 
   const liabData = await liabRes.json()
+  if (liabData.error_code) {
+    return new Response(JSON.stringify({ error: `Plaid liabilities error: ${liabData.error_message}` }), {
+      status: 400,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+  }
+
   const liability = liabData.liabilities?.credit?.find(
     (l: any) => l.account_id === card.plaid_account_id
   )

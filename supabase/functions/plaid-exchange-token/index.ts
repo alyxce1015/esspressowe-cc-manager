@@ -52,11 +52,27 @@ Deno.serve(async (req) => {
     institution_id,
   })
 
+  // Resolve account_id — use what was passed, or fall back to fetching from Plaid
+  let resolvedAccountId = account_id
+  if (!resolvedAccountId && card_id) {
+    const accountsRes = await fetch(`${PLAID_BASE_URL}/accounts/get`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ client_id: PLAID_CLIENT_ID, secret: PLAID_SECRET, access_token }),
+    })
+    const accountsData = await accountsRes.json()
+    const accounts = accountsData.accounts ?? []
+    const creditAccount = accounts.find((a: any) => a.type === 'credit') ?? accounts[0]
+    resolvedAccountId = creditAccount?.account_id ?? null
+  }
+
   // Link the Plaid account to the card
-  await supabase.from('cards').update({
-    plaid_account_id: account_id,
-    plaid_item_id: item_id,
-  }).eq('id', card_id)
+  if (card_id) {
+    await supabase.from('cards').update({
+      plaid_account_id: resolvedAccountId,
+      plaid_item_id: item_id,
+    }).eq('id', card_id)
+  }
 
   return new Response(JSON.stringify({ success: true }), {
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },

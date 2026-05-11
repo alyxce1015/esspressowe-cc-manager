@@ -219,17 +219,17 @@ export async function plaidGetLinkToken(): Promise<string> {
 
 export async function plaidExchangeToken(opts: {
   publicToken: string;
-  accountId: string;
-  cardId: string;
   institutionName: string;
   institutionId: string;
+  accountId?: string;
+  cardId?: string;
 }): Promise<void> {
   await callEdge('plaid-exchange-token', {
     public_token: opts.publicToken,
-    account_id: opts.accountId,
-    card_id: opts.cardId,
     institution_name: opts.institutionName,
     institution_id: opts.institutionId,
+    ...(opts.accountId && { account_id: opts.accountId }),
+    ...(opts.cardId && { card_id: opts.cardId }),
   });
 }
 
